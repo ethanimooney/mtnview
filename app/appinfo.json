@@ -1,6 +1,6 @@
 {
-  "id": "com.cleanframe.launcher",
-  "version": "1.7.0",
+  "id": "com.mtnview.launcher",
+  "version": "1.0.0",
   "vendor": "mtnview",
   "type": "web",
   "main": "index.html",

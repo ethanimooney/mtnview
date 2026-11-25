@@ -1,4 +1,4 @@
-/* CleanFrame Home for LG webOS. Static materials, local preferences and webOS Luna controls. */
+/* mtnview Home for LG webOS. Static materials, local preferences and webOS Luna controls. */
 (function () {
   'use strict';
 
@@ -33,7 +33,7 @@
     { id: '5', name: 'Every 5 minutes', min: 5 }, { id: '15', name: 'Every 15 minutes', min: 15 },
     { id: '60', name: 'Every hour', min: 60 }
   ];
-  var KEY = 'cleanframe.home.v1', storageOk = true, catalog = { loading: false, loaded: false, error: null, request: 0, revision: 0 };
+  var KEY = 'mtnview.home.v1', storageOk = true, catalog = { loading: false, loaded: false, error: null, request: 0, revision: 0 };
   var QA = window.ShoreQA = { minuteMs: window.ShoreQA && window.ShoreQA.minuteMs || 60000 };
   var FONTS = {
     inter: { name: 'Inter', family: 'Inter', display: 600, ui: 500, clock: 500 },
@@ -68,7 +68,7 @@
   ];
   var BG_MOTION_NAMES = { aerial: 'Aerial video', kenburns: 'Motion photos', static: 'Static' };
   var AMBIENT_IDLE_MS = 150000;
-  var WEATHER_KEY = 'cleanframe.weather.v1';
+  var WEATHER_KEY = 'mtnview.weather.v1';
   var SNAZZY_DEFAULT_PORTS = { appletv: 1, ps5: 3, switch: 4 };
   var SNAZZY_CARDS = [
     { id: 'appletv', name: 'Apple TV', verb: 'watch', kind: 'hdmi', wall: 'misty' },

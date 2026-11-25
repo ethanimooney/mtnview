@@ -34,7 +34,7 @@
     'com.webos.app.factorywin', 'com.webos.app.softwareupdate', 'com.webos.app.self-diagnosis',
     'com.webos.app.quicksettings', 'com.webos.app.inputcommon'
   ];
-  var SELF = 'com.cleanframe.launcher';
+  var SELF = 'com.mtnview.launcher';
 
   function hasLuna() {
     return !!(

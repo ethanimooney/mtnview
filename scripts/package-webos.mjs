@@ -60,8 +60,8 @@ const controlText = [
   'Priority: optional',
   'Architecture: all',
   `Installed-Size: ${installedBytes}`,
-  `Maintainer: ${appinfo.vendor || 'CleanFrame'} <noreply@cleanframe.local>`,
-  `Description: ${appinfo.title || 'CleanFrame'} launcher for LG webOS`,
+  `Maintainer: ${appinfo.vendor || 'mtnview'} <noreply@mtnview.local>`,
+  `Description: ${appinfo.title || 'mtnview'} launcher for LG webOS`,
   'webOS-Package-Format-Version: 2',
   'webOS-Packager-Version: 1.0.0',
   ''

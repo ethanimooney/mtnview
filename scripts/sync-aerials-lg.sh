@@ -10,8 +10,8 @@ if [ -z "$TV_IP" ]; then
   exit 1
 fi
 SRC="$ROOT/app/assets/aerials"
-DEST="/media/developer/cleanframe-aerials"
-APP_AERIALS="/media/developer/apps/usr/palm/applications/com.cleanframe.launcher/assets/aerials"
+DEST="/media/developer/mtnview-aerials"
+APP_AERIALS="/media/developer/apps/usr/palm/applications/com.mtnview.launcher/assets/aerials"
 
 echo "Preparing $DEST on root@$TV_IP..."
 ssh "root@$TV_IP" "mkdir -p '$DEST'"

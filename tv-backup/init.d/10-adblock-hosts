@@ -1,6 +1,6 @@
 #!/bin/sh
-cp /etc/hosts /tmp/cleanframe-hosts
-cat << "HOSTS" >> /tmp/cleanframe-hosts
+cp /etc/hosts /tmp/mtnview-hosts
+cat << "HOSTS" >> /tmp/mtnview-hosts
 0.0.0.0 ad.lgappstv.com
 0.0.0.0 us.ad.lgsmartad.com
 0.0.0.0 us.info.lgsmartad.com
@@ -15,4 +15,4 @@ cat << "HOSTS" >> /tmp/cleanframe-hosts
 0.0.0.0 su-ssl.lge.com
 0.0.0.0 su-dev.lge.com
 HOSTS
-mount --bind /tmp/cleanframe-hosts /etc/hosts
+mount --bind /tmp/mtnview-hosts /etc/hosts

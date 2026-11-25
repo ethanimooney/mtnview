@@ -1,7 +1,7 @@
 const fs = require("fs");
 const { execFile } = require("child_process");
 
-const LAUNCHER = "com.cleanframe.launcher";
+const LAUNCHER = "com.mtnview.launcher";
 const HOTKEYS = {
   1037: { target: "com.webos.app.hdmi1", cancel: "netflix" },
   1038: { target: "com.webos.app.hdmi3", cancel: "amazon" },
@@ -12,7 +12,7 @@ const sz = process.arch === "arm64" ? 24 : 16;
 let lastPress = 0;
 
 function log(msg) {
-  try { fs.appendFileSync("/tmp/cleanframe-home.log", new Date().toISOString() + " " + msg + "\n"); } catch (e) {}
+  try { fs.appendFileSync("/tmp/mtnview-home.log", new Date().toISOString() + " " + msg + "\n"); } catch (e) {}
 }
 
 process.on("uncaughtException", (err) => log("ERR: " + (err && err.stack || err)));

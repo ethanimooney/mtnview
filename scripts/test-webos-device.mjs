@@ -117,7 +117,7 @@ test('apps filters out internal webOS apps, HDMI inputs, and self', (_, done) =>
       setTimeout(() => this.onservicecallback(JSON.stringify({
         returnValue: true,
         launchPoints: [
-          { id: 'com.cleanframe.launcher', title: 'CleanFrame' },
+          { id: 'com.mtnview.launcher', title: 'mtnview' },
           { id: 'com.webos.app.hdmi1', title: 'HDMI 1' },
           { id: 'com.webos.app.home', title: 'Home' },
           { id: 'netflix', title: 'Netflix' },

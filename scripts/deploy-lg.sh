@@ -18,12 +18,12 @@ echo "2/4 Building LG webOS .ipk..."
 "$NODE_BIN" "$ROOT/scripts/package-webos.mjs"
 
 VERSION="$("$NODE_BIN" -e "console.log(require('$ROOT/app/appinfo.json').version)")"
-IPK="$ROOT/dist/com.cleanframe.launcher_${VERSION}_all.ipk"
+IPK="$ROOT/dist/com.mtnview.launcher_${VERSION}_all.ipk"
 
 echo "3/4 Uploading $(basename "$IPK") to root@$TV_IP..."
-scp -O "$IPK" "root@$TV_IP:/tmp/cleanframe.ipk"
+scp -O "$IPK" "root@$TV_IP:/tmp/mtnview.ipk"
 
 echo "4/4 Installing, re-linking persistent Aerials, and launching mtnview v$VERSION..."
-ssh "root@$TV_IP" "luna-send-pub -n 6 'luna://com.webos.appInstallService/dev/install' '{\"id\":\"com.cleanframe.launcher\",\"ipkUrl\":\"/tmp/cleanframe.ipk\",\"subscribe\":true}' && if [ -d /media/developer/cleanframe-aerials ]; then rm -rf /media/developer/apps/usr/palm/applications/com.cleanframe.launcher/assets/aerials && ln -s /media/developer/cleanframe-aerials /media/developer/apps/usr/palm/applications/com.cleanframe.launcher/assets/aerials; fi && sleep 1 && luna-send -n 1 'luna://com.webos.applicationManager/launch' '{\"id\":\"com.cleanframe.launcher\"}'"
+ssh "root@$TV_IP" "luna-send-pub -n 6 'luna://com.webos.appInstallService/dev/install' '{\"id\":\"com.mtnview.launcher\",\"ipkUrl\":\"/tmp/mtnview.ipk\",\"subscribe\":true}' && if [ -d /media/developer/mtnview-aerials ]; then rm -rf /media/developer/apps/usr/palm/applications/com.mtnview.launcher/assets/aerials && ln -s /media/developer/mtnview-aerials /media/developer/apps/usr/palm/applications/com.mtnview.launcher/assets/aerials; fi && sleep 1 && luna-send -n 1 'luna://com.webos.applicationManager/launch' '{\"id\":\"com.mtnview.launcher\"}'"
 
 echo "Done! mtnview v$VERSION deployed to $TV_IP."
