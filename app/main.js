@@ -387,7 +387,7 @@
       ambient: s.ambient === false ? false : true,
       ambientSleep: pick(s.ambientSleep, ['30', '60', 'off'], '30'),
       autoNight: s.autoNight === false ? false : true,
-      bgMotion: pick(s.bgMotion, ['aerial', 'kenburns', 'static'], 'aerial'),
+      bgMotion: 'aerial',
       pictureMode: pick(s.pictureMode, ['cinema', 'filmmaker', 'game', 'night'], 'cinema'),
       ports: (s.ports && s.ports.ps5 !== undefined) ? {
         appletv: [0, 1, 2, 3, 4].indexOf(s.ports.appletv) >= 0 ? s.ports.appletv : SNAZZY_DEFAULT_PORTS.appletv,
@@ -987,7 +987,7 @@
     if (S.c.layout === 'cards') {
       return [
         { id: 'devices', label: 'Device HDMI Ports', value: 'HDMI 1, 3 & 4' },
-        { id: 'motion', label: 'Background & Aerials', value: BG_MOTION_NAMES[S.c.bgMotion] || 'Aerial video' },
+        { id: 'motion', label: 'Mountain Aerials', value: currentAerialItem().title + ' · ' + AERIAL_MOUNTAINS.length + ' scenes' },
         { id: 'preferences', label: 'Ambient & Audio', value: (S.c.ambient !== false ? 'OLED ambient on' : 'Ambient off') + ' · ' + (S.c.sounds !== false ? 'Sounds on' : 'Muted') },
         { id: 'samsung', label: 'LG TV', value: 'Inputs, TV settings & LG Home' }
       ];
@@ -1018,7 +1018,7 @@
     if (id === 'editor') openEditor('settings');
     else openAppearance(id);
   }
-  var DETAIL_NAMES = { background: 'Background', layout: 'Layout', typography: 'Typography', focus: 'Focus', rotation: 'Rotation', samsung: 'LG TV', inputs: 'Inputs', devices: 'Device Ports', motion: 'Background & Aerials', preferences: 'Ambient & Audio' };
+  var DETAIL_NAMES = { background: 'Background', layout: 'Layout', typography: 'Typography', focus: 'Focus', rotation: 'Rotation', samsung: 'LG TV', inputs: 'Inputs', devices: 'Device Ports', motion: 'Mountain Aerials', preferences: 'Ambient & Audio' };
   function choice(axis, value, disabled) {
     return { action: axis === 'mode' ? 'rotation.' + value : 'choice.' + axis + '.' + value, axis: axis, value: value, disabled: !!disabled,
       label: axis === 'font' ? FONTS[value].name : axis === 'mode' ? MODES.filter(function (m) { return m.id === value; })[0].name : value === 'both' ? 'Both' : VALUE_NAMES[value] };
@@ -1057,11 +1057,9 @@
     if (t.group === 'rotation') return [{ id: 'mode', title: '', items: options('mode', MODES.map(function (m) { return m.id; }), flat),
       reason: flat ? 'Choose Photo in Background to use rotation.' : 'Timed changes pause while Settings or another panel is open.' }];
     if (t.group === 'motion') return [
-      { id: 'bg_motion', title: 'Motion & Aerials', items: [
-        { action: 'samsung.bgMotion', label: 'Background motion: ' + (BG_MOTION_NAMES[S.c.bgMotion] || 'Aerial video'), description: 'Cycle between Yosemite & Scottish Highlands mountain Aerials, Motion photos, or Static' },
-        { action: 'samsung.todWall', label: 'Time-of-day wallpapers: ' + (S.c.todWall !== false ? 'On' : 'Off'), description: 'Shift fallback nature photos for morning, day, sunset & night' }
-      ] },
-      { id: 'wall', title: 'Fallback wallpaper', items: [{ action: 'background.wallpaper', label: wall(S.c.wall).name, thumbnail: true }] }
+      { id: 'aerial_pick', title: 'Now playing', items: AERIAL_MOUNTAINS.map(function (item, idx) {
+        return { action: 'aerial.pick.' + idx, aerialPick: idx, label: item.title, description: item.sub };
+      }) }
     ];
     if (t.group === 'preferences') return [
       { id: 'prefs', title: 'OLED Protection & Audio', items: [
@@ -1126,6 +1124,11 @@
       if (error && error.patch[error.row] !== undefined) detailFocus(t, choice(error.row, error.patch[error.row]), 0);
       if (error && error.row === 'mode') applyRotation(error.patch.mode);
       else if (error) setLook(error.patch, { row: error.row });
+    } else if (typeof item.aerialPick === 'number') {
+      clearTimeout(aerialTransTimer);
+      aerialTransitioning = false;
+      aerialIdx = item.aerialPick % AERIAL_MOUNTAINS.length;
+      syncAerialVideo();
     } else if (item.portDev) {
       c = next(S.c.home.slice(), S.c.recent.slice());
       c.ports[item.portDev] = item.portVal;
@@ -2124,8 +2127,8 @@
     appearanceTitle.textContent = DETAIL_NAMES[t.group];
     var at = detailLocation(t), selected = at.item, error = S.lookError, status = '', hint;
     function command(item, inner, cls) {
-      var applied = (item.axis && S.c[item.axis] === item.value) || (item.portDev && S.c.ports[item.portDev] === item.portVal);
-      var isRadio = !!(item.axis || item.portDev);
+      var applied = (item.axis && S.c[item.axis] === item.value) || (item.portDev && S.c.ports[item.portDev] === item.portVal) || (typeof item.aerialPick === 'number' && (aerialIdx % AERIAL_MOUNTAINS.length) === item.aerialPick);
+      var isRadio = !!(item.axis || item.portDev || typeof item.aerialPick === 'number');
       var loading = !!(item.axis && S.pending && S.pending.target[item.axis] === item.value && S.pending.row === item.axis);
       return '<button type="button" tabindex="-1" class="setting-choice' + (cls ? ' ' + cls : '') + (t.f.action === item.action ? ' is-focus' : '') + (item.disabled ? ' is-disabled' : '') + (applied ? ' is-applied' : '') + (loading ? ' is-loading' : '') + '"'
         + (isRadio ? ' role="radio" aria-checked="' + !!applied + '"' : '') + ' aria-label="' + esc(item.axis && item.value === 'both' ? 'Icons and text' : item.label) + '" aria-disabled="' + !!item.disabled + '" aria-busy="' + loading + '"'
@@ -2145,7 +2148,7 @@
             : '<img class="setting-swatch" src="' + WP + S.c.wall + '-thumb.jpg" alt="">';
           body += '<span class="setting-copy"><span class="setting-name">' + esc(item.label) + '</span>'
             + (item.description ? '<span class="setting-description">' + esc(item.description) + '</span>' : '') + '</span>';
-          if (!item.axis && !item.portDev) body += icon('right', 'setting-forward');
+          if (!item.axis && !item.portDev && typeof item.aerialPick !== 'number') body += icon('right', 'setting-forward');
           return command(item, body, item.description ? 'has-description' : '');
         }).join('') + '</div>'
         + (section.reason ? '<p class="setting-reason">' + esc(section.reason) + '</p>' : '') + '</section>';
@@ -2156,7 +2159,7 @@
         + command({ action: 'settings.retry', label: 'Try again' }, '<span>Try again</span>', 'setting-retry');
     }
     setHTML(appearanceStatus, status);
-    hint = selected.disabled ? '' : selected.action === 'settings.back' ? 'Return to ' + backLabel : selected.action === 'settings.retry' ? 'Retry this change' : (selected.axis || selected.portDev) ? 'Apply selected setting' : selected.action === 'background.wallpaper' ? 'Choose a wallpaper' : selected.action === 'background.rotation' ? 'Choose a rotation interval' : /^samsung\.(ambient|ambientSleep|autoNight|sounds|bgMotion|todWall)$/.test(selected.action) ? 'Change setting' : 'Open on the TV';
+    hint = selected.disabled ? '' : selected.action === 'settings.back' ? 'Return to ' + backLabel : selected.action === 'settings.retry' ? 'Retry this change' : typeof selected.aerialPick === 'number' ? 'Play this Aerial' : (selected.axis || selected.portDev) ? 'Apply selected setting' : selected.action === 'background.wallpaper' ? 'Choose a wallpaper' : selected.action === 'background.rotation' ? 'Choose a rotation interval' : /^samsung\.(ambient|ambientSleep|autoNight|sounds)$/.test(selected.action) ? 'Change setting' : 'Open on the TV';
     setHTML(appearanceDesc, hint ? '<span class="remote-key">OK</span><span>' + esc(hint) + '</span>' : '');
   }
   function renderWallpaper(t) {
