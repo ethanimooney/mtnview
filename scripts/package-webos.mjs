@@ -70,8 +70,8 @@ fs.writeFileSync(path.join(controlRoot, 'control'), controlText);
 const controlTar = path.join(workDir, 'control.tar.gz');
 const dataTar = path.join(workDir, 'data.tar.gz');
 const tarEnv = { ...process.env, COPYFILE_DISABLE: '1' };
-execFileSync('/usr/bin/tar', ['-czf', controlTar, '-C', controlRoot, './control'], { env: tarEnv });
-execFileSync('/usr/bin/tar', ['-czf', dataTar, '-C', dataRoot, './usr'], { env: tarEnv });
+execFileSync('tar', ['-czf', controlTar, '-C', controlRoot, './control'], { env: tarEnv });
+execFileSync('tar', ['-czf', dataTar, '-C', dataRoot, './usr'], { env: tarEnv });
 
 function arMember(name, data) {
   const mtime = Math.floor(Date.now() / 1000);
