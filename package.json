@@ -3,6 +3,14 @@
   "version": "1.0.1",
   "private": true,
   "description": "Minimalist, ad-free LG webOS TV launcher (forked from CleanFrame).",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ethanimooney/mtnview.git"
+  },
+  "homepage": "https://github.com/ethanimooney/mtnview#readme",
+  "bugs": {
+    "url": "https://github.com/ethanimooney/mtnview/issues"
+  },
   "license": "MIT",
   "scripts": {
     "test": "node --test scripts/test-webos-device.mjs",
