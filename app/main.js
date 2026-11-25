@@ -57,15 +57,13 @@
   ];
   var AMBIENT_WALLS = ['forest', 'misty', 'alpine', 'peaks'];
   var AMBIENT_SLEEP_NAMES = { '30': 'After 30 min', '60': 'After 60 min', off: 'Off' };
-  var AERIAL_HOME = [
+  var AERIAL_MOUNTAINS = [
     { src: 'assets/aerials/yosemite-valley.mp4', title: 'Yosemite Valley', sub: 'California' },
-    { src: 'assets/aerials/hawaii-coast.mp4', title: 'Kohala Valley', sub: 'Hawaii' },
-    { src: 'assets/aerials/sf-headlands.mp4', title: 'Marin Headlands', sub: 'San Francisco' }
-  ];
-  var AERIAL_AMBIENT = [
     { src: 'assets/aerials/yosemite-forest.mp4', title: 'Yosemite High Country', sub: 'California' },
-    { src: 'assets/aerials/hawaii-peaks.mp4', title: 'Na Pali Ridge', sub: 'Hawaii' },
-    { src: 'assets/aerials/sf-bay.mp4', title: 'Golden Gate & Bay', sub: 'San Francisco' }
+    { src: 'assets/aerials/yosemite-peaks.mp4', title: 'Sierra Peaks', sub: 'Yosemite' },
+    { src: 'assets/aerials/yosemite-ridge.mp4', title: 'El Capitan & Cliffs', sub: 'Yosemite' },
+    { src: 'assets/aerials/scotland-highlands.mp4', title: 'Scottish Highlands', sub: 'Scotland' },
+    { src: 'assets/aerials/scotland-loch.mp4', title: 'Glencoe & Peaks', sub: 'Scotland' }
   ];
   var BG_MOTION_NAMES = { aerial: 'Aerial video', kenburns: 'Motion photos', static: 'Static' };
   var AMBIENT_IDLE_MS = 150000;
@@ -1060,7 +1058,7 @@
       reason: flat ? 'Choose Photo in Background to use rotation.' : 'Timed changes pause while Settings or another panel is open.' }];
     if (t.group === 'motion') return [
       { id: 'bg_motion', title: 'Motion & Aerials', items: [
-        { action: 'samsung.bgMotion', label: 'Background motion: ' + (BG_MOTION_NAMES[S.c.bgMotion] || 'Aerial video'), description: 'Cycle between Yosemite/Hawaii/SF Aerials, Ken Burns motion, or Static' },
+        { action: 'samsung.bgMotion', label: 'Background motion: ' + (BG_MOTION_NAMES[S.c.bgMotion] || 'Aerial video'), description: 'Cycle between Yosemite & Scottish Highlands mountain Aerials, Motion photos, or Static' },
         { action: 'samsung.todWall', label: 'Time-of-day wallpapers: ' + (S.c.todWall !== false ? 'On' : 'Off'), description: 'Shift fallback nature photos for morning, day, sunset & night' }
       ] },
       { id: 'wall', title: 'Fallback wallpaper', items: [{ action: 'background.wallpaper', label: wall(S.c.wall).name, thumbnail: true }] }
@@ -1403,7 +1401,7 @@
     if (ambientActive) return AMBIENT_WALLS[ambientWallIdx % AMBIENT_WALLS.length];
     if (t && (t.id === 'wallpaper' || (t.id === 'appearance' && t.group === 'background')) && S.wallShown) return S.wallShown;
     if (S.c.wall && S.c.wall !== 'misty') return S.c.wall;
-    if (S.c.todWall !== false) return timeOfDayWalls()[aerialHomeIdx % 4] || 'forest';
+    if (S.c.todWall !== false) return timeOfDayWalls()[aerialIdx % 4] || 'forest';
     return 'misty';
   }
   function pollCardInputs() {
@@ -1556,26 +1554,24 @@
         }
         if (now - ambientShiftAt >= 45000) {
           ambientShiftAt = now;
-          ambientWallIdx = (ambientWallIdx + 1) % AMBIENT_WALLS.length;
           ambientSpotIdx = (ambientSpotIdx + 1) % AMBIENT_SPOTS.length;
           ambientPos = AMBIENT_SPOTS[ambientSpotIdx];
-          renderSnazzyCards(homeState(top()));
+          var ambEl = $('snazzyAmbient');
+          if (ambEl) ambEl.style.transform = 'translate3d(' + ambientPos.x + 'px,' + ambientPos.y + 'px,0)';
         }
       }
     }, 10000);
   }
 
-  var aerialSlot = 0, aerialCurrentSrc = '', aerialPreloadSrc = '', aerialTransitioning = false;
-  var aerialHomeIdx = Math.floor(Math.random() * AERIAL_HOME.length), aerialAmbientIdx = Math.floor(Math.random() * AERIAL_AMBIENT.length);
+  var aerialSlot = 0, aerialCurrentSrc = '', aerialPreloadSrc = '', aerialTransitioning = false, aerialTransTimer = 0;
+  var aerialIdx = Math.floor(Math.random() * AERIAL_MOUNTAINS.length);
   var locTimer = 0, locShownSrc = '';
-  function activeAerialList() { return ambientActive ? AERIAL_AMBIENT : AERIAL_HOME; }
+  function activeAerialList() { return AERIAL_MOUNTAINS; }
   function currentAerialItem() {
-    var list = activeAerialList(), idx = ambientActive ? aerialAmbientIdx : aerialHomeIdx;
-    return list[idx % list.length];
+    return AERIAL_MOUNTAINS[aerialIdx % AERIAL_MOUNTAINS.length];
   }
   function nextAerialItem() {
-    var list = activeAerialList(), idx = (ambientActive ? aerialAmbientIdx : aerialHomeIdx) + 1;
-    return list[idx % list.length];
+    return AERIAL_MOUNTAINS[(aerialIdx + 1) % AERIAL_MOUNTAINS.length];
   }
   function showAerialLocation(item, force) {
     var el = $('snazzyLoc');
@@ -1601,15 +1597,15 @@
     try { standby.load(); } catch (e) { /* ignore */ }
   }
   function nextAerialVideo() {
-    if (aerialTransitioning) return;
-    if (ambientActive) aerialAmbientIdx = (aerialAmbientIdx + 1) % AERIAL_AMBIENT.length;
-    else aerialHomeIdx = (aerialHomeIdx + 1) % AERIAL_HOME.length;
+    clearTimeout(aerialTransTimer);
+    aerialTransitioning = false;
+    aerialIdx = (aerialIdx + 1) % AERIAL_MOUNTAINS.length;
     syncAerialVideo();
   }
   function prevAerialVideo() {
-    if (aerialTransitioning) return;
-    if (ambientActive) aerialAmbientIdx = (aerialAmbientIdx - 1 + AERIAL_AMBIENT.length) % AERIAL_AMBIENT.length;
-    else aerialHomeIdx = (aerialHomeIdx - 1 + AERIAL_HOME.length) % AERIAL_HOME.length;
+    clearTimeout(aerialTransTimer);
+    aerialTransitioning = false;
+    aerialIdx = (aerialIdx - 1 + AERIAL_MOUNTAINS.length) % AERIAL_MOUNTAINS.length;
     syncAerialVideo();
   }
   function syncAerialVideo() {
@@ -1635,6 +1631,8 @@
     var nextSlot = aerialCurrentSrc ? (1 - aerialSlot) : aerialSlot;
     var nextVid = aerialVid(nextSlot), oldVid = aerialCurrentSrc ? curVid : null;
     aerialTransitioning = true;
+    clearTimeout(aerialTransTimer);
+    aerialTransTimer = setTimeout(function () { aerialTransitioning = false; }, 6000);
     aerialCurrentSrc = item.src;
     nextVid.muted = true;
     nextVid.defaultMuted = true;
@@ -1713,9 +1711,9 @@
     if (wallList.indexOf(activeWall) < 0) wallList.push(activeWall);
     var photosEl = $('snazzyPhotos'), clockEl = $('snazzyClock'), bodyEl = $('snazzyStageBody'), ambEl = $('snazzyAmbient');
     var motionMode = S.c.bgMotion || 'aerial';
-    snazzyHome.className = 'snazzy-home' + (ambientActive ? ' is-ambient' : '') + (oledBlack ? ' is-oled-black' : '') + (isNightDim() ? ' is-night-dim' : '') + (motionMode !== 'static' ? ' is-kenburns' : '');
+    snazzyHome.className = 'snazzy-home' + (ambientActive ? ' is-ambient' : '') + (oledBlack ? ' is-oled-black' : '') + (isNightDim() ? ' is-night-dim' : '') + (motionMode === 'kenburns' ? ' is-kenburns' : '') + (motionMode === 'aerial' ? ' is-aerial-only' : '');
     syncAerialVideo();
-    keyed(photosEl, wallList.map(function (w) { return { key: w, id: w }; }), function (img, it) {
+    keyed(photosEl, motionMode === 'aerial' ? [] : wallList.map(function (w) { return { key: w, id: w }; }), function (img, it) {
       var src = WP + it.id + '.jpg';
       if (img._src !== src) { img._src = src; img.src = src; img.alt = ''; }
       img.className = 'snazzy-bg-photo' + (it.id === activeWall ? ' is-active' : '');
