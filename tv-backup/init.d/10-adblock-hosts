@@ -1,18 +1,36 @@
 #!/bin/sh
+# Block LG OTA firmware updates (preserves root), ACR/telemetry beacons, and ads.
+# Idempotent: unmounts any previous bind-mount before rebuilding /tmp/mtnview-hosts.
+umount /etc/hosts 2>/dev/null || true
 cp /etc/hosts /tmp/mtnview-hosts
+
 cat << "HOSTS" >> /tmp/mtnview-hosts
-0.0.0.0 ad.lgappstv.com
-0.0.0.0 us.ad.lgsmartad.com
-0.0.0.0 us.info.lgsmartad.com
-0.0.0.0 lgad.cjpowercast.com
-0.0.0.0 us.rdx2.lgtvsdp.com
-0.0.0.0 rdx2.lgtvsdp.com
-0.0.0.0 smartclip.net
-0.0.0.0 smartclip.com
-0.0.0.0 yumenetworks.com
-0.0.0.0 snu.lge.com
-0.0.0.0 su.lge.com
-0.0.0.0 su-ssl.lge.com
-0.0.0.0 su-dev.lge.com
+
+# --- LG OTA Firmware Updates (preserve root) ---
+0.0.0.0 snu.lge.com su.lge.com su-ssl.lge.com su-dev.lge.com su-op.lge.com snu-dev.lge.com snu-op.lge.com
+:: snu.lge.com su.lge.com su-ssl.lge.com su-dev.lge.com su-op.lge.com snu-dev.lge.com snu-op.lge.com
+
+# --- LG Ads & Promotions ---
+0.0.0.0 ad.lgappstv.com lgsmartad.com ad.lgsmartad.com us.ad.lgsmartad.com aic.ad.lgsmartad.com
+:: ad.lgappstv.com lgsmartad.com ad.lgsmartad.com us.ad.lgsmartad.com aic.ad.lgsmartad.com
+0.0.0.0 info.lgsmartad.com us.info.lgsmartad.com aic.info.lgsmartad.com
+:: info.lgsmartad.com us.info.lgsmartad.com aic.info.lgsmartad.com
+0.0.0.0 lgad.cjpowercast.com smartclip.net smartclip.com yumenetworks.com ngfts.lge.com qt2-ngfts.lge.com
+:: lgad.cjpowercast.com smartclip.net smartclip.com yumenetworks.com ngfts.lge.com qt2-ngfts.lge.com
+
+# --- LG ACR, Telemetry, Beacons & Nudges ---
+0.0.0.0 rdx2.lgtvsdp.com us.rdx2.lgtvsdp.com aic.rdx2.lgtvsdp.com
+:: rdx2.lgtvsdp.com us.rdx2.lgtvsdp.com aic.rdx2.lgtvsdp.com
+0.0.0.0 acr.lgtvsdp.com us.acr.lgtvsdp.com log.lgtvsdp.com us.log.lgtvsdp.com
+:: acr.lgtvsdp.com us.acr.lgtvsdp.com log.lgtvsdp.com us.log.lgtvsdp.com
+0.0.0.0 nudge.lgtvsdp.com us.nudge.lgtvsdp.com aic.nudge.lgtvsdp.com
+:: nudge.lgtvsdp.com us.nudge.lgtvsdp.com aic.nudge.lgtvsdp.com
+0.0.0.0 recommend.lgtvsdp.com us.recommend.lgtvsdp.com aic.recommend.lgtvsdp.com
+:: recommend.lgtvsdp.com us.recommend.lgtvsdp.com aic.recommend.lgtvsdp.com
+0.0.0.0 ibs.lgappstv.com us.ibs.lgappstv.com
+:: ibs.lgappstv.com us.ibs.lgappstv.com
+0.0.0.0 cdpsvc.lgtvcommon.com us.cdpsvc.lgtvcommon.com cdpbeacon.lgtvcommon.com us.cdpbeacon.lgtvcommon.com aic.cdpbeacon.lgtvcommon.com
+:: cdpsvc.lgtvcommon.com us.cdpsvc.lgtvcommon.com cdpbeacon.lgtvcommon.com us.cdpbeacon.lgtvcommon.com aic.cdpbeacon.lgtvcommon.com
 HOSTS
+
 mount --bind /tmp/mtnview-hosts /etc/hosts
