@@ -31,12 +31,12 @@ fi
 echo "3/4 Elevating Home Chooser service (if installed)..."
 ssh "root@$TV_IP" '
 if [ -d /media/developer/apps/usr/palm/applications/org.webosbrew.homechooser ]; then
-  luna-send -n 1 "luna://org.webosbrew.hbchannel.service/elevateService" "{\"service\":\"org.webosbrew.homechooser.service\"}" || true
+  luna-send -n 1 "luna://org.webosbrew.hbchannel.service/elevateService" "{\"id\":\"org.webosbrew.homechooser.service\"}" || true
 fi
 '
 
 echo "4/4 Restarting mtnview-home remote daemon..."
-ssh "root@$TV_IP" '/var/lib/webosbrew/init.d/99-mtnview-home && sleep 1 && ps | grep "[m]tnview-home.js"'
+ssh "root@$TV_IP" '/var/lib/webosbrew/init.d/99-mtnview-home && sleep 1 && kill -0 $(cat /tmp/mtnview-home.pid) && echo "mtnview-home running (pid=$(cat /tmp/mtnview-home.pid))"'
 
 echo "Done! TV system scripts restored on $TV_IP."
 echo "Next (if rebuilding from scratch): ./scripts/deploy-lg.sh && ./scripts/sync-aerials-lg.sh"

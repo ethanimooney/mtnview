@@ -1,7 +1,12 @@
 #!/bin/sh
 if [ -f /tmp/mtnview-home.pid ]; then
-  kill $(cat /tmp/mtnview-home.pid) 2>/dev/null
+  kill $(cat /tmp/mtnview-home.pid) 2>/dev/null || true
 fi
+pkill -f "/var/lib/webosbrew/mtnview-home.js" 2>/dev/null || true
 NODE_BIN=$(which node 2>/dev/null || echo /usr/bin/node)
-UV_THREADPOOL_SIZE=8 nohup "$NODE_BIN" /var/lib/webosbrew/mtnview-home.js >>/tmp/mtnview-home.log 2>&1 </dev/null &
+if command -v setsid >/dev/null 2>&1; then
+  UV_THREADPOOL_SIZE=8 setsid "$NODE_BIN" /var/lib/webosbrew/mtnview-home.js >>/tmp/mtnview-home.log 2>&1 </dev/null &
+else
+  UV_THREADPOOL_SIZE=8 nohup "$NODE_BIN" /var/lib/webosbrew/mtnview-home.js >>/tmp/mtnview-home.log 2>&1 </dev/null &
+fi
 echo $! > /tmp/mtnview-home.pid

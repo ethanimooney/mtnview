@@ -108,27 +108,35 @@ function watchDevice(dev) {
   });
 }
 
-// Auto-return to CleanFrame when active HDMI 1/3/4 device powers off (6s grace period)
-let watchedPort = null, wasConnected = false, lostCount = 0;
+// Auto-return to mtnview when any non-Apple-TV HDMI device powers off (6s grace period)
+let watchedPort = null, wasLive = false, lostCount = 0;
 setInterval(() => {
   getForegroundApp((app) => {
-    const m = /^com\.webos\.app\.hdmi([134])$/.exec(app);
-    if (!m) { watchedPort = null; wasConnected = false; lostCount = 0; return; }
+    const m = /^com\.webos\.app\.hdmi([1-4])$/.exec(app);
+    if (!m) { watchedPort = null; wasLive = false; lostCount = 0; return; }
     const port = m[1];
-    if (watchedPort !== port) { watchedPort = port; wasConnected = false; lostCount = 0; }
+    if (watchedPort !== port) { watchedPort = port; wasLive = false; lostCount = 0; }
     luna("luna://com.webos.service.eim/getAllInputStatus", {}, (err, out) => {
       if (err || !out) return;
       try {
         const data = JSON.parse(out);
         const dev = (data.devices || []).find((d) => d.id === "HDMI_" + port);
         if (!dev) return;
-        if (dev.connected) {
-          wasConnected = true;
+        const subs = Array.isArray(dev.subList) ? dev.subList : [];
+        const simplink = subs.find((s) => s && s.id === "SIMPLINK");
+        const urcu = subs.find((s) => s && s.id === "URCU");
+        const desc = [dev.label, simplink && simplink.osdName, urcu && urcu.brandName].filter(Boolean).join(" ");
+        // Never auto-leave Apple TV (Apple TV CEC manages TV power directly)
+        if (/apple\s*tv/i.test(desc)) return;
+        const live = !!(dev.hdmiSignalExist || dev.activate || (simplink && simplink.cecPower === "On"));
+        if (live) {
+          wasLive = true;
           lostCount = 0;
-        } else if (wasConnected) {
+        } else if (wasLive) {
           lostCount++;
           if (lostCount >= 2) {
-            wasConnected = false;
+            log("HDMI_" + port + " (" + (dev.label || "device") + ") signal lost -> returning to mtnview");
+            wasLive = false;
             lostCount = 0;
             launchTarget(LAUNCHER);
           }
