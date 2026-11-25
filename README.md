@@ -38,7 +38,7 @@
 
 ### Option A: Quick Install (Non-Rooted or Rooted — Pre-Built `.ipk`)
 The core `mtnview` app (~109 KB) works on **any LG webOS TV**, rooted or non-rooted:
-1. Download `com.mtnview.launcher_1.0.1_all.ipk` from the [**Latest GitHub Release**](https://github.com/ethanimooney/mtnview/releases/latest).
+1. Download `com.mtnview.launcher_<version>_all.ipk` from the [**Latest GitHub Release**](https://github.com/ethanimooney/mtnview/releases/latest).
 2. Install it using [**webOS Dev Manager**](https://github.com/webosbrew/dev-manager-desktop) (Dev Mode) or **Homebrew Channel**.
 
 ### Option B: Full Rooted Setup (Aerials + Zero-Flash Home + Daemons)

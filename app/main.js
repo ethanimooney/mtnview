@@ -3,7 +3,7 @@
   'use strict';
 
   var CONFIG = {
-    version: '1.0.1',
+    version: '1.1.0',
     prefsKey: 'mtnview.home.v1',
     weatherKey: 'mtnview.weather.v1',
     hdmiCacheKey: 'mtnview.hdmi.v1',
