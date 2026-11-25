@@ -50,7 +50,7 @@
   }
   function unavailable(done) {
     done({
-      message: 'Open CleanFrame on your LG TV to use this control.',
+      message: 'Open mtnview on your LG TV to use this control.',
       detail: 'The web preview cannot control the TV.'
     });
   }
