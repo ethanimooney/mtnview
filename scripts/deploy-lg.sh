@@ -24,6 +24,19 @@ echo "3/4 Uploading $(basename "$IPK") to root@$TV_IP..."
 scp -O "$IPK" "root@$TV_IP:/tmp/mtnview.ipk"
 
 echo "4/4 Installing, re-linking persistent Aerials, and launching mtnview v$VERSION..."
-ssh "root@$TV_IP" "luna-send-pub -n 12 'luna://com.webos.appInstallService/dev/install' '{\"id\":\"com.mtnview.launcher\",\"ipkUrl\":\"/tmp/mtnview.ipk\",\"subscribe\":true}'; i=0; while [ ! -d /media/developer/apps/usr/palm/applications/com.mtnview.launcher/assets ] && [ \$i -lt 20 ]; do sleep 1; i=\$((i+1)); done; if [ -d /media/developer/mtnview-aerials ]; then rm -rf /media/developer/apps/usr/palm/applications/com.mtnview.launcher/assets/aerials && ln -s /media/developer/mtnview-aerials /media/developer/apps/usr/palm/applications/com.mtnview.launcher/assets/aerials; fi && sleep 1 && luna-send -n 1 'luna://com.webos.applicationManager/launch' '{\"id\":\"com.mtnview.launcher\"}'"
+ssh "root@$TV_IP" '
+luna-send-pub -i "luna://com.webos.appInstallService/dev/install" "{\"id\":\"com.mtnview.launcher\",\"ipkUrl\":\"/tmp/mtnview.ipk\",\"subscribe\":true}" | while IFS= read -r line; do
+  echo "$line"
+  case "$line" in
+    *"\"installed\""*|*"\"install failed\""*|*"\"errorCode\""*) break ;;
+  esac
+done
+if [ -d /media/developer/mtnview-aerials ] && [ -d /media/developer/apps/usr/palm/applications/com.mtnview.launcher/assets ]; then
+  rm -rf /media/developer/apps/usr/palm/applications/com.mtnview.launcher/assets/aerials
+  ln -s /media/developer/mtnview-aerials /media/developer/apps/usr/palm/applications/com.mtnview.launcher/assets/aerials
+fi
+sleep 1
+luna-send -n 1 "luna://com.webos.applicationManager/launch" "{\"id\":\"com.mtnview.launcher\"}"
+'
 
 echo "Done! mtnview v$VERSION deployed to $TV_IP."
