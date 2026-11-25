@@ -92,3 +92,9 @@ After editing app code, just run:
 | **Yellow** | In `mtnview` | Toggles Ambient Mode |
 | **Blue** | In `mtnview` | Skips to next mountain Aerial |
 | **Down** | On cards | Enters Ambient Mode (**Left/Right** skips Aerials) |
+
+---
+
+## Credits
+Originally forked and adapted from [CleanFrame](https://github.com/nthnclrk/CleanFrame) by [@nthnclrk](https://github.com/nthnclrk), then rebuilt for LG webOS with live HDMI detection, full-length mountain Aerials, and OLED panel protection.
+
