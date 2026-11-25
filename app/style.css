@@ -133,7 +133,8 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 /* ---------- Settings Detail ---------- */
 .detail-back { position: absolute; left: 134px; top: 56px; }
 .detail-title { position: absolute; left: 134px; top: 138px; font-size: 54px; line-height: 64px; font-weight: 600; letter-spacing: -0.03em; }
-.detail-rows { position: absolute; left: 134px; top: 244px; width: 684px; max-height: 696px; overflow-y: auto; padding: 6px; margin: -6px; }
+.detail-rows { position: absolute; left: 134px; top: 244px; width: 684px; max-height: 656px; overflow-y: auto; padding: 8px 12px 28px 12px; margin: -8px -12px 0 -12px; }
+.detail-rows.has-more { -webkit-mask-image: linear-gradient(to bottom, #000 0, #000 calc(100% - 44px), transparent 100%); mask-image: linear-gradient(to bottom, #000 0, #000 calc(100% - 44px), transparent 100%); }
 .detail-rows::-webkit-scrollbar { display: none; }
 .sec + .sec { margin-top: 22px; }
 .sec-label { margin-bottom: 12px; font-size: 24px; line-height: 32px; font-weight: 600; letter-spacing: 0.01em; color: rgba(255, 255, 255, 0.62); }
@@ -146,7 +147,9 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 .choice > * + * { margin-left: 14px; }
 .choice.is-applied { border-color: rgba(110, 231, 183, 0.45); background: rgba(26, 36, 42, 0.66); }
 .choice.is-focus { background: rgba(255, 255, 255, 0.94); color: #111315; border-color: #fff; transform: translateY(-2px) scale(1.015); box-shadow: 0 20px 44px rgba(0, 0, 0, 0.40), inset 0 1px 0 #fff; }
-.choice.is-disabled { opacity: 0.55; }
+.choice.is-disabled { opacity: 0.86; }
+.choice.is-disabled.is-focus { background: rgba(255, 255, 255, 0.16); color: #fff; border-color: rgba(255, 255, 255, 0.42); transform: none; box-shadow: none; }
+.choice.is-disabled.is-focus .choice-desc { color: rgba(255, 255, 255, 0.78); }
 .choice-copy { min-width: 0; flex: 1; display: flex; flex-direction: column; }
 .choice-copy > * + * { margin-top: 3px; }
 .choice-name { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

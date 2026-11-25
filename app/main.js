@@ -680,8 +680,13 @@
   }
   function closeOverlay() {
     cancelSwitching();
-    if (S.view === 'detail') { S.view = 'settings'; render(); }
-    else { S.view = 'home'; render(); }
+    if (S.view === 'detail' && (S.detailGroup === 'apps' || S.detailGroup === 'about')) {
+      openDetail('lgtv');
+    } else if (S.view === 'detail') {
+      S.view = 'settings'; render();
+    } else {
+      S.view = 'home'; render();
+    }
   }
 
   /* ---------- Settings Model ---------- */
@@ -956,9 +961,11 @@
     }
 
     var model = detailModel(S.detailGroup), rows = detailRows(model);
+    var prevRowsEl = $('detailRows'), prevScroll = (prevRowsEl && prevRowsEl._group === S.detailGroup) ? prevRowsEl.scrollTop : 0;
     S.detailRow = clamp(S.detailRow, 0, rows.length - 1);
     S.detailCol = clamp(S.detailCol, 0, rows[S.detailRow].length - 1);
     var focusedItem = rows[S.detailRow][S.detailCol];
+    var backLbl = (S.detailGroup === 'apps' || S.detailGroup === 'about') ? 'LG TV' : 'Settings';
     var rowCursor = 1;
     var secHtml = model.sections.map(function (sec) {
       var optsHtml = sec.items.map(function (it, col) {
@@ -968,20 +975,29 @@
         return '<button type="button" tabindex="-1" class="choice' + (isFoc ? ' is-focus' : '') + (it.applied ? ' is-applied' : '') + (it.disabled ? ' is-disabled' : '') + '" data-z="detail" data-r="' + r + '" data-c="' + c + '">'
           + '<span class="choice-copy"><span class="choice-name">' + esc(it.label) + '</span>'
           + (it.desc ? '<span class="choice-desc">' + esc(it.desc) + '</span>' : '') + '</span>'
-          + (it.radio ? '<span class="choice-tick">' + (it.applied ? icon('check') : '') + '</span>' : icon('right', 'choice-fwd'))
+          + (it.radio ? '<span class="choice-tick">' + (it.applied ? icon('check') : '') + '</span>' : it.disabled ? '' : icon('right', 'choice-fwd'))
           + '</button>';
       }).join('');
       if (sec.horiz) rowCursor++;
       return '<div class="sec' + (sec.horiz ? ' is-horiz' : '') + '">' + (sec.title ? '<h3 class="sec-label">' + esc(sec.title) + '</h3>' : '') + '<div class="sec-opts">' + optsHtml + '</div></div>';
     }).join('');
-    var hint = focusedItem.action === 'back' ? 'Return to Settings' : typeof focusedItem.aerialIdx === 'number' ? 'Play this Aerial' : focusedItem.radio ? 'Apply selected setting' : focusedItem.action.indexOf('toggle.') === 0 ? 'Change setting' : 'Open on the TV';
-    setHTML(overlayEl, '<div class="detail-back"><button type="button" tabindex="-1" class="choice back-btn' + (S.detailRow === 0 ? ' is-focus' : '') + '" data-z="detail" data-r="0" data-c="0">' + icon('left') + '<span>Settings</span></button></div>'
+    var hintHtml = focusedItem.disabled
+      ? '<span class="remote-key">Back</span><span>Return to ' + esc(backLbl) + '</span>'
+      : '<span class="remote-key">OK</span><span>' + esc(focusedItem.action === 'back' ? 'Return to ' + backLbl : typeof focusedItem.aerialIdx === 'number' ? 'Play this Aerial' : focusedItem.radio ? 'Apply selected setting' : focusedItem.action.indexOf('toggle.') === 0 ? 'Change setting' : 'Open on the TV') + '</span>';
+    setHTML(overlayEl, '<div class="detail-back"><button type="button" tabindex="-1" class="choice back-btn' + (S.detailRow === 0 ? ' is-focus' : '') + '" data-z="detail" data-r="0" data-c="0">' + icon('left') + '<span>' + esc(backLbl) + '</span></button></div>'
       + '<h2 class="detail-title">' + esc(model.title) + '</h2>'
       + '<div class="detail-rows" id="detailRows">' + secHtml + '</div>'
-      + '<p class="ov-hint"><span class="remote-key">OK</span><span>' + esc(hint) + '</span></p>');
-    var focEl = overlayEl.querySelector('.detail-rows .is-focus');
-    if (focEl && typeof focEl.scrollIntoView === 'function') {
-      try { focEl.scrollIntoView({ block: 'nearest' }); } catch (e) { /* ignore */ }
+      + '<p class="ov-hint">' + hintHtml + '</p>');
+    var rowsEl = $('detailRows');
+    if (rowsEl) {
+      rowsEl._group = S.detailGroup;
+      rowsEl.scrollTop = prevScroll;
+      var focEl = rowsEl.querySelector('.is-focus');
+      if (focEl && typeof focEl.scrollIntoView === 'function') {
+        try { focEl.scrollIntoView({ block: 'nearest' }); } catch (e) { /* ignore */ }
+      }
+      var hasMore = rowsEl.scrollHeight > rowsEl.clientHeight + 4 && (rowsEl.scrollTop + rowsEl.clientHeight < rowsEl.scrollHeight - 4);
+      rowsEl.className = 'detail-rows' + (hasMore ? ' has-more' : '');
     }
   }
 
