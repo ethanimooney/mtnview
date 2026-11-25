@@ -1,6 +1,14 @@
-# mtnview
+<p align="center">
+  <img src="app/icon.png" width="112" height="112" alt="mtnview icon" style="border-radius: 24px;" />
+</p>
 
-A minimalist, ad-free LG webOS TV launcher (`com.mtnview.launcher`) built for a rooted **LG OLED C6** (webOS 11.2.0 / Rockhopper).
+<h1 align="center">mtnview</h1>
+
+<p align="center">
+  A minimalist, ad-free LG webOS TV launcher (<code>com.mtnview.launcher</code>) built for a rooted <strong>LG OLED C6</strong> (webOS 11.2.0 / Rockhopper).
+</p>
+
+---
 
 ## Features
 - **Live Dynamic HDMI Cards:** Reads plugged-in HDMI inputs, CEC names, and live power state from `luna://com.webos.service.eim/getAllInputStatus`, automatically hides eARC soundbars, matches device icons (Apple TV, PS5, Nintendo Switch, Xbox, streaming boxes, generic HDMI), and caches sleeping device names per port.
@@ -9,8 +17,67 @@ A minimalist, ad-free LG webOS TV launcher (`com.mtnview.launcher`) built for a 
 - **Frosted-Glass Settings:** Matching dark translucent cards for **HDMI Inputs**, **Mountain Aerials** scene picker, **Ambient & Audio**, and **LG TV**.
 - **Rooted TV Daemons (`tv-backup/`):**
   - `mtnview-home.js` + `init.d/99-mtnview-home`: Dynamic remote hotkeys, global Screen Off shortcut, and auto-return to `mtnview` when non-Apple-TV HDMI consoles power off (6s grace period).
-  - `init.d/99-mtnview`: Auto-launches `mtnview` on boot & Quick Start+ wake (skipping if Apple TV is active).
+  - `init.d/99-mtnview`: Auto-launches `mtnview` on boot & Quick Start+ wake (automatically skipping when Apple TV or another active HDMI device wakes the TV via CEC).
   - `init.d/10-adblock-hosts`: Blocks LG ads, telemetry, and firmware update servers via bind-mounted `/etc/hosts`.
+
+---
+
+## Installation
+
+### Prerequisites
+- A rooted LG webOS TV with **Homebrew Channel** (`org.webosbrew.hbchannel`) and **SSH** enabled (port `22`, `root`).
+- **Home Chooser** (`org.webosbrew.homechooser`) installed from Homebrew Channel (for zero-flash native Home button replacement).
+- A Mac with **Node.js 20+** and passwordless SSH access to the TV (`ssh-copy-id root@<TV_IP>`).
+
+### 1. Clone & configure TV IP
+```sh
+git clone https://github.com/ethanimooney/mtnview.git
+cd mtnview
+mkdir -p .local
+cat << 'EOF' > .local/tv.env
+LG_TV_IP=192.168.1.XX
+NODE_BIN=$(which node)
+EOF
+```
+*(You can also pass `<TV_IP>` directly as the first argument to any script instead of creating `.local/tv.env`.)*
+
+### 2. Download & convert the 6 mountain Aerials (macOS)
+```sh
+./scripts/download-aerials.sh
+```
+Downloads the 6 full-length Yosemite & Scottish Highlands Apple Aerials and converts them into fast-start 720p MP4s in `app/assets/aerials/` (gitignored).
+
+### 3. Build & install `mtnview` on the TV
+```sh
+./scripts/deploy-lg.sh
+```
+Runs unit tests, builds the ~200 KB `.ipk` package in `dist/`, installs it via `appInstallService`, links persistent Aerials, and launches `mtnview`.
+
+### 4. Sync the Aerial videos to persistent TV storage
+```sh
+./scripts/sync-aerials-lg.sh
+```
+Uploads the 6 MP4s to `/media/developer/mtnview-aerials` on the TV (bypassing `/tmp`) and symlinks them into the installed app so future app updates stay ~200 KB and take ~1 second.
+
+### 5. Install TV daemons, ad-blocker & elevate Home Chooser
+```sh
+./scripts/restore-tv.sh
+```
+Copies `mtnview-home.js` and `init.d/*` scripts to `/var/lib/webosbrew/`, applies `/etc/hosts` ad & update blocking, elevates `org.webosbrew.homechooser.service`, and starts the remote & wake daemons.
+
+### 6. Set `mtnview` as your default Home screen
+1. Open **Home Chooser** on your LG TV.
+2. Select **mtnview**.
+3. Press the **Home** button on your Magic Remote — `mtnview` now opens natively with zero LG Home flash.
+
+### Updating later
+After editing app code, just run:
+```sh
+./scripts/deploy-lg.sh
+```
+*(If you also update the app icon, bump `"version"` in `app/appinfo.json` and reboot the TV so webOS refreshes its icon cache.)*
+
+---
 
 ## Magic Remote Shortcuts
 | Button | Where | Action |
@@ -25,11 +92,3 @@ A minimalist, ad-free LG webOS TV launcher (`com.mtnview.launcher`) built for a 
 | **Yellow** | In `mtnview` | Toggles Ambient Mode |
 | **Blue** | In `mtnview` | Skips to next mountain Aerial |
 | **Down** | On cards | Enters Ambient Mode (**Left/Right** skips Aerials) |
-
-## Scripts
-Create a gitignored `.local/tv.env` with `LG_TV_IP=<your-tv-ip>` (or pass the IP as `$1`):
-
-- `./scripts/deploy-lg.sh` — Runs unit tests, builds the `.ipk` (~200 KB), installs via `appInstallService`, re-links persistent Aerials, and launches `mtnview`.
-- `./scripts/download-aerials.sh` — Downloads & converts the 6 full-length mountain Apple Aerials into fast-start MP4s on macOS.
-- `./scripts/sync-aerials-lg.sh` — Syncs mountain Aerial MP4s to `/media/developer/mtnview-aerials` on the TV and removes stale clips.
-- `./scripts/restore-tv.sh` — Restores `mtnview-home.js`, all `init.d` scripts, hosts block, and Home Chooser service elevation on a rooted TV.
