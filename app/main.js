@@ -41,11 +41,12 @@
     { src: 'assets/aerials/scotland-loch.mp4', title: 'Glencoe & Peaks', sub: 'Scotland' }
   ];
 
-  var DEFAULT_CARDS = [
-    { id: 'hdmi-1', port: 1, name: 'Apple TV', icon: 'appletv', verb: 'watch', kind: 'hdmi' },
-    { id: 'hdmi-3', port: 3, name: 'PS5', icon: 'ps5', verb: 'play', kind: 'hdmi' },
-    { id: 'hdmi-4', port: 4, name: 'Nintendo Switch', icon: 'switch', verb: 'play', kind: 'hdmi' },
-    { id: 'tvsettings', port: 0, name: 'TV Settings', icon: 'tvsettings', verb: 'open', kind: 'settings' }
+  var SETTINGS_CARD = { id: 'tvsettings', port: 0, name: 'TV Settings', icon: 'tvsettings', verb: 'open', kind: 'settings' };
+  var PREVIEW_CARDS = [
+    { id: 'hdmi-1', port: 1, name: 'HDMI 1', icon: 'hdmi', verb: 'watch', kind: 'hdmi' },
+    { id: 'hdmi-2', port: 2, name: 'HDMI 2', icon: 'hdmi', verb: 'watch', kind: 'hdmi' },
+    { id: 'hdmi-3', port: 3, name: 'HDMI 3', icon: 'hdmi', verb: 'watch', kind: 'hdmi' },
+    SETTINGS_CARD
   ];
 
   var AMBIENT_SPOTS = [
@@ -100,7 +101,16 @@
   function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
   function icon(name, cls) { return '<svg class="ico' + (cls ? ' ' + cls : '') + '" viewBox="0 0 24 24" aria-hidden="true">' + SVG[name] + '</svg>'; }
   function setHTML(el, html) { if (el && el._h !== html) { el._h = html; el.innerHTML = html; } }
-  function cards() { return (liveCards && liveCards.length) ? liveCards : DEFAULT_CARDS; }
+  function hasTvBridge() {
+    return !!(
+      (window.webOS && window.webOS.service && typeof window.webOS.service.request === 'function') ||
+      typeof window.PalmServiceBridge === 'function'
+    );
+  }
+  function cards() {
+    if (liveCards && liveCards.length) return liveCards;
+    return hasTvBridge() ? [SETTINGS_CARD] : PREVIEW_CARDS;
+  }
 
   /* ---------- Preferences ---------- */
   function loadPrefs() {
@@ -189,7 +199,20 @@
         + '<path fill="none" stroke="currentColor" stroke-width="6" stroke-linecap="round" d="M36 38c14 10 34 30 48 48M84 38c-14 10-34 30-48 48"/>'
         + '</svg>';
     }
-    if (id === 'steam') {
+    if (id === 'pc') {
+      return '<svg class="dev-svg" viewBox="0 0 120 120" aria-hidden="true">'
+        + '<rect x="16" y="24" width="88" height="58" rx="8" fill="none" stroke="currentColor" stroke-width="6"/>'
+        + '<line x1="42" y1="96" x2="78" y2="96" stroke="currentColor" stroke-width="6" stroke-linecap="round"/>'
+        + '<line x1="60" y1="82" x2="60" y2="96" stroke="currentColor" stroke-width="6" stroke-linecap="round"/>'
+        + '</svg>';
+    }
+    if (id === 'disc') {
+      return '<svg class="dev-svg" viewBox="0 0 120 120" aria-hidden="true">'
+        + '<circle cx="60" cy="60" r="38" fill="none" stroke="currentColor" stroke-width="6"/>'
+        + '<circle cx="60" cy="60" r="11" fill="none" stroke="currentColor" stroke-width="5.5"/>'
+        + '</svg>';
+    }
+    if (id === 'gamepad') {
       return '<svg class="dev-svg" viewBox="0 0 120 120" aria-hidden="true">'
         + '<path fill="none" stroke="currentColor" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" d="M36 38h48c12.2 0 22 9.8 22 22 0 6.8-3.1 13.2-8.4 17.4l-7.2 5.7c-3.9 3.1-9.6 2.3-12.5-1.8l-5.8-8.3H47.9l-5.8 8.3c-2.9 4.1-8.6 4.9-12.5 1.8l-7.2-5.7C17.1 73.2 14 66.8 14 60c0-12.2 9.8-22 22-22z"/>'
         + '<path fill="none" stroke="currentColor" stroke-width="5.5" stroke-linecap="round" d="M38 51v14M31 58h14"/>'
@@ -229,16 +252,31 @@
   }
   function detectIcon(name, serviceType) {
     var s = String(name || '').toLowerCase();
+    var st = String(serviceType || '').toLowerCase();
     if (/apple\s*tv/.test(s)) return 'appletv';
     if (/ps[345]|playstation/.test(s)) return 'ps5';
-    if (/switch|nintendo/.test(s)) return 'switch';
+    if (/switch|nintendo|wii|gamecube/.test(s)) return 'switch';
     if (/xbox/.test(s)) return 'xbox';
-    if (/steam|pc|mac|computer/.test(s) || serviceType === 'game') return 'steam';
-    if (serviceType === 'ott' || /roku|chromecast|shield|fire\s*tv/.test(s)) return 'streaming';
+    if (/steam\s*deck|console|retro|atari|sega/.test(s) || st === 'game') return 'gamepad';
+    if (/\bpc\b|\bmac\b|macbook|imac|windows|linux|computer|laptop|desktop|htpc/.test(s) || st === 'pc') return 'pc';
+    if (/blu-?ray|\bbd\b|\bdvd\b|\buhd\b|panasonic|oppo|disc/.test(s) || st === 'bd' || st === 'dvd') return 'disc';
+    if (st === 'ott' || st === 'stb' || /roku|chromecast|google\s*tv|shield|fire\s*tv|tivo|cable|xfinity|directv|dish|mi\s*box|onn/.test(s)) return 'streaming';
     return 'hdmi';
   }
   function detectVerb(iconId, serviceType) {
-    return (iconId === 'ps5' || iconId === 'switch' || iconId === 'xbox' || iconId === 'steam' || serviceType === 'game') ? 'play' : 'watch';
+    if (iconId === 'ps5' || iconId === 'switch' || iconId === 'xbox' || iconId === 'gamepad' || serviceType === 'game') return 'play';
+    if (iconId === 'pc') return 'use';
+    return 'watch';
+  }
+  function seedCardsFromCache() {
+    var cache = loadHdmiCache(), nums = Object.keys(cache).map(Number).filter(function (n) { return n >= 1 && n <= 4; }).sort(function (a, b) { return a - b; });
+    if (!nums.length) return;
+    liveCards = nums.map(function (num) {
+      var entry = cache[num] || {}, name = entry.name || ('HDMI ' + num), stype = entry.serviceType || '';
+      var iconId = detectIcon(name, stype);
+      return { id: 'hdmi-' + num, port: num, name: name, icon: iconId, verb: detectVerb(iconId, stype), kind: 'hdmi' };
+    });
+    liveCards.push(SETTINGS_CARD);
   }
   function buildLiveCards(list) {
     var cache = loadHdmiCache(), dirty = false, out = [], i, item, generic, name, stype, iconId;
@@ -646,7 +684,7 @@
       sections: [{
         title: '',
         items: [
-          { action: 'lgtv.inputs', label: 'Switch HDMI Input', desc: 'Pick any HDMI 1–4 input directly (incl. HDMI 2 Sonos eARC)' },
+          { action: 'lgtv.inputs', label: 'Switch HDMI Input', desc: 'Pick any HDMI 1–4 input directly (including eARC / soundbar ports)' },
           { action: 'lgtv.settings', label: 'LG TV Settings', desc: 'Picture, sound and network settings' },
           { action: 'lgtv.home', label: 'LG webOS Home', desc: 'Open LG’s stock Home screen' }
         ]
@@ -969,6 +1007,7 @@
   /* ---------- Boot ---------- */
   for (var v = 0; v < 2; v++) { aerialVids[v].muted = true; aerialVids[v].defaultMuted = true; aerialVids[v].playsInline = true; }
   loadPrefs();
+  if (hasTvBridge()) seedCardsFromCache();
   fit();
   render();
   focusStage();

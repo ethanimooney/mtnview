@@ -26,7 +26,7 @@ maybe_launch() {
       const subs = (dev && Array.isArray(dev.subList)) ? dev.subList : [];
       const simplink = subs.find((s) => s && s.id === "SIMPLINK");
       const desc = [dev && dev.label, simplink && simplink.osdName].filter(Boolean).join(" ");
-      const isAppleTv = /apple\s*tv/i.test(desc) || hm[1] === "1";
+      const isAppleTv = /apple\s*tv/i.test(desc);
       const hasSignal = !!(dev && (dev.hdmiSignalExist || dev.activate || (simplink && simplink.cecPower === "On")));
       if (isAppleTv || hasSignal) process.exit(0);
     }

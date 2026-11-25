@@ -15,18 +15,18 @@ const CONFIG = {
   activeHdmiPollMs: 3000,
   signalLostTicks: 2, // 2 x 3s = 6s grace period before returning to mtnview
   roleRefreshMs: 60000,
-  // Linux evdev keycodes -> target role (auto-resolved from EIM) and stock app to cancel
+  // Linux evdev keycodes -> target role (auto-resolved from live EIM metadata) and stock app to cancel
   hotkeys: {
-    1037: { role: "appletv", fallback: "com.webos.app.hdmi1", cancel: "netflix" },
-    1038: { role: "ps5", fallback: "com.webos.app.hdmi3", cancel: "amazon" },
-    1042: { role: "switch", fallback: "com.webos.app.hdmi4", cancel: "com.disney.disneyplus-prod" }
+    1037: { role: "appletv", cancel: "netflix" },
+    1038: { role: "ps5", cancel: "amazon" },
+    1042: { role: "switch", cancel: "com.disney.disneyplus-prod" }
   },
   screenOffKey: 1043, // LG Channels button -> OLED Screen Off (works globally for eARC/soundbar audio)
   blockKeys: { 1133: true, 1137: true } // News, YouTube
 };
 
 const EV_SIZE = process.arch === "arm64" ? 24 : 16;
-const rolePorts = { appletv: "com.webos.app.hdmi1", ps5: "com.webos.app.hdmi3", switch: "com.webos.app.hdmi4" };
+const rolePorts = {};
 let lastPress = 0;
 
 function log(msg) {
@@ -127,7 +127,8 @@ function watchDevice(dev) {
         if (now - lastPress < CONFIG.hotkeyDebounceMs) continue;
         lastPress = now;
         const hk = CONFIG.hotkeys[code];
-        const target = rolePorts[hk.role] || hk.fallback;
+        const target = rolePorts[hk.role];
+        if (!target) continue;
         launchTarget(target);
         for (const ms of [450, 1200, 2200]) {
           setTimeout(() => {

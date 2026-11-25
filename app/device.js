@@ -98,23 +98,36 @@
   function cancelSource() { if (sourceCancel) sourceCancel(); }
 
   function defaultHdmiList() {
-    return [
-      { number: 1, name: 'Apple TV', label: 'AppleTV', osdName: 'Apple TV', brandName: 'Apple', serviceType: 'ott', isAudio: false, pluggedIn: true, connected: true, active: true, appId: 'com.webos.app.hdmi1', inputId: 'HDMI_1' },
-      { number: 2, name: 'Sonos Beam', label: 'Sonos Sound Bar', osdName: 'Sonos Beam', brandName: 'Sonos', serviceType: 'audio', isAudio: true, pluggedIn: true, connected: true, active: false, appId: 'com.webos.app.hdmi2', inputId: 'HDMI_2' },
-      { number: 3, name: 'PS5', label: 'PS5 Game Console', osdName: '', brandName: 'PS5', serviceType: 'game', isAudio: false, pluggedIn: true, connected: true, active: false, appId: 'com.webos.app.hdmi3', inputId: 'HDMI_3' },
-      { number: 4, name: 'Nintendo Switch', label: 'Nintendo Switch', osdName: '', brandName: 'Nintendo', serviceType: 'game', isAudio: false, pluggedIn: true, connected: false, active: false, appId: 'com.webos.app.hdmi4', inputId: 'HDMI_4' }
-    ];
+    return [1, 2, 3, 4].map(function (n) {
+      return {
+        number: n,
+        name: 'HDMI ' + n,
+        label: 'HDMI ' + n,
+        osdName: '',
+        brandName: '',
+        serviceType: '',
+        isAudio: false,
+        pluggedIn: false,
+        connected: false,
+        active: false,
+        appId: 'com.webos.app.hdmi' + n,
+        inputId: 'HDMI_' + n
+      };
+    });
   }
 
   function cleanDeviceName(label, osdName, brandName, num) {
     var generic = /^hdmi[\s_-]*\d*$/i;
     var raw = '';
     if (osdName && !generic.test(osdName.trim())) raw = osdName.trim();
-    else if (brandName && /^(?:ps[345]|xbox|nintendo\s*switch|apple\s*tv|roku|shield|chromecast|fire\s*tv)$/i.test(brandName.trim())) raw = brandName.trim();
+    else if (brandName && /^(?:ps[345]|playstation|xbox|nintendo\s*switch|apple\s*tv|roku|shield|nvidia\s*shield|chromecast|google\s*tv|fire\s*tv|steam\s*deck|tivo|blu-?ray)$/i.test(brandName.trim())) raw = brandName.trim();
     else if (label && !generic.test(label.trim())) raw = label.trim();
     else if (brandName && !generic.test(brandName.trim())) raw = brandName.trim();
     else return 'HDMI ' + num;
     if (/^apple\s*tv$/i.test(raw)) return 'Apple TV';
+    if (/^nintendo\s*switch$/i.test(raw)) return 'Nintendo Switch';
+    if (/^fire\s*tv$/i.test(raw)) return 'Fire TV';
+    if (/^google\s*tv$/i.test(raw)) return 'Google TV';
     if (/^ps5\s+game\s+console$/i.test(raw)) return 'PS5';
     if (/^ps4\s+game\s+console$/i.test(raw)) return 'PS4';
     return raw;
@@ -146,7 +159,7 @@
         var isAudio = serviceType === 'audio'
           || (urcu && urcu.connectedInput === 'ARC')
           || (simplink && simplink.cecpDevType === 5)
-          || /sound\s*bar|sonos|home\s*theater|receiver|\bavr\b/i.test(label + ' ' + osdName);
+          || /sound\s*bar|sonos|bose|sennheiser|denon|marantz|yamaha|onkyo|home\s*theater|receiver|\bavr\b/i.test(label + ' ' + osdName);
         var pluggedIn = dev.hdmiPlugIn !== undefined ? !!dev.hdmiPlugIn : !!dev.connected;
         var isAwake = !!(dev.active || dev.activate || dev.hdmiSignalExist || (simplink && simplink.cecPower === 'On'));
         list.push({
