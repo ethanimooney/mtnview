@@ -35,8 +35,8 @@ if [ -d /media/developer/apps/usr/palm/applications/org.webosbrew.homechooser ];
 fi
 '
 
-echo "4/4 Restarting mtnview-home remote daemon..."
-ssh "root@$TV_IP" '/var/lib/webosbrew/init.d/99-mtnview-home && sleep 1 && kill -0 $(cat /tmp/mtnview-home.pid) && echo "mtnview-home running (pid=$(cat /tmp/mtnview-home.pid))"'
+echo "4/4 Restarting mtnview-home remote daemon and wake watcher..."
+ssh "root@$TV_IP" '/var/lib/webosbrew/init.d/99-mtnview-home && /var/lib/webosbrew/init.d/99-mtnview && sleep 1 && kill -0 $(cat /tmp/mtnview-home.pid) && echo "mtnview-home running (pid=$(cat /tmp/mtnview-home.pid))"'
 
 echo "Done! TV system scripts restored on $TV_IP."
 echo "Next (if rebuilding from scratch): ./scripts/deploy-lg.sh && ./scripts/sync-aerials-lg.sh"

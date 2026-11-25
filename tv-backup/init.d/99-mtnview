@@ -1,7 +1,57 @@
 #!/bin/sh
+# Auto-launch mtnview on boot and Quick Start+ wake,
+# UNLESS the TV was woken directly by Apple TV (or another active HDMI device via CEC).
+
+if [ -f /tmp/mtnview-wake.pid ]; then
+  kill $(cat /tmp/mtnview-wake.pid) 2>/dev/null || true
+fi
+pkill -f "tvpower/power/getPowerState" 2>/dev/null || true
+
+NODE_BIN=$(which node 2>/dev/null || echo /usr/bin/node)
+
+maybe_launch() {
+  "$NODE_BIN" -e '
+    const { execFileSync } = require("child_process");
+    function luna(uri) {
+      try { return JSON.parse(execFileSync("/usr/bin/luna-send", ["-n", "1", uri, "{}"], { encoding: "utf8", timeout: 4000 })); }
+      catch (e) { return null; }
+    }
+    const fg = luna("luna://com.webos.applicationManager/getForegroundAppInfo");
+    const appId = (fg && fg.appId) || "";
+    if (appId === "com.mtnview.launcher") process.exit(0);
+
+    const eim = luna("luna://com.webos.service.eim/getAllInputStatus");
+    const devices = (eim && Array.isArray(eim.devices)) ? eim.devices : [];
+
+    // If an HDMI input is already foregrounded (e.g. Apple TV or console woke TV via CEC),
+    // stay on it as long as it is Apple TV or actively outputting a signal.
+    const hm = /^com\.webos\.app\.hdmi([1-4])$/.exec(appId);
+    if (hm) {
+      const dev = devices.find((d) => d.id === "HDMI_" + hm[1]);
+      const subs = (dev && Array.isArray(dev.subList)) ? dev.subList : [];
+      const simplink = subs.find((s) => s && s.id === "SIMPLINK");
+      const desc = [dev && dev.label, simplink && simplink.osdName].filter(Boolean).join(" ");
+      const isAppleTv = /apple\s*tv/i.test(desc) || hm[1] === "1";
+      const hasSignal = !!(dev && (dev.hdmiSignalExist || dev.activate || (simplink && simplink.cecPower === "On")));
+      if (isAppleTv || hasSignal) process.exit(0);
+    }
+
+    // Even if foreground has not settled yet, skip if Apple TV is actively signalling right now.
+    const atv = devices.find((d) => {
+      const subs = Array.isArray(d.subList) ? d.subList : [];
+      const sl = subs.find((s) => s && s.id === "SIMPLINK");
+      return /apple\s*tv/i.test((d.label || "") + " " + ((sl && sl.osdName) || ""));
+    });
+    if (atv && atv.hdmiSignalExist) process.exit(0);
+
+    execFileSync("/usr/bin/luna-send", ["-n", "1", "luna://com.webos.applicationManager/launch", "{\"id\":\"com.mtnview.launcher\"}"], { stdio: "ignore", timeout: 4000 });
+  ' >/dev/null 2>&1
+}
+
 (
+  # Boot check: wait briefly for CEC Active Source to settle before deciding
   sleep 4
-  luna-send -n 1 'luna://com.webos.applicationManager/launch' '{"id":"com.mtnview.launcher"}' >/dev/null 2>&1
+  maybe_launch
 
   LAST_STATE=""
   luna-send -i 'luna://com.webos.service.tvpower/power/getPowerState' '{"subscribe":true}' 2>/dev/null | while IFS= read -r line; do
@@ -9,12 +59,8 @@
       *'"Active"'*)
         if [ "$LAST_STATE" != "Active" ]; then
           LAST_STATE="Active"
-          sleep 2
-          FG=$(luna-send -n 1 'luna://com.webos.applicationManager/getForegroundAppInfo' '{}' 2>/dev/null)
-          case "$FG" in
-            *'com.webos.app.hdmi1'*) ;;
-            *) luna-send -n 1 'luna://com.webos.applicationManager/launch' '{"id":"com.mtnview.launcher"}' >/dev/null 2>&1 ;;
-          esac
+          sleep 3
+          maybe_launch
         fi
         ;;
       *'"state"'*)
@@ -22,4 +68,5 @@
         ;;
     esac
   done
-) &
+) </dev/null >/dev/null 2>&1 &
+echo $! > /tmp/mtnview-wake.pid
