@@ -1,11 +1,20 @@
 #!/bin/sh
-# Download & convert the 6 full-length mountain Apple Aerials into fast-start MP4s (macOS).
-# Skips files that already exist locally unless --force is passed.
+# Download & convert the 6 full-length mountain Apple Aerials into fast-start MP4s.
+# Works on macOS (avconvert) and Linux/WSL (ffmpeg). Skips existing files unless --force is passed.
 set -e
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 OUT_DIR="$ROOT/app/assets/aerials"
 FORCE="${1:-}"
 mkdir -p "$OUT_DIR"
+
+if [ -x /usr/bin/avconvert ]; then
+  CONVERTER="avconvert"
+elif command -v ffmpeg >/dev/null 2>&1; then
+  CONVERTER="ffmpeg"
+else
+  echo "Error: requires macOS /usr/bin/avconvert or ffmpeg in PATH." >&2
+  exit 1
+fi
 
 # Remove any legacy non-mountain Aerials
 rm -f "$OUT_DIR/hawaii-coast.mp4" "$OUT_DIR/hawaii-peaks.mp4" "$OUT_DIR/sf-headlands.mp4" "$OUT_DIR/sf-bay.mp4"
@@ -21,8 +30,12 @@ dl_full() {
   fi
   echo "Downloading $name..."
   curl -sL --max-time 300 -o "$tmp" "$url"
-  echo "Converting $name to fast-start MP4..."
-  /usr/bin/avconvert --source "$tmp" --output "$out" --preset Preset1280x720 --replace >/dev/null
+  echo "Converting $name to fast-start MP4 ($CONVERTER)..."
+  if [ "$CONVERTER" = "avconvert" ]; then
+    /usr/bin/avconvert --source "$tmp" --output "$out" --preset Preset1280x720 --replace >/dev/null
+  else
+    ffmpeg -y -loglevel error -i "$tmp" -vf scale=1280:720 -c:v libx264 -preset fast -crf 22 -movflags +faststart -an "$out"
+  fi
   rm -f "$tmp"
   ls -lh "$out"
 }

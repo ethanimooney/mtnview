@@ -21,7 +21,7 @@ ssh "$TV_USER@$TV_IP" "mkdir -p '$DEST' && rm -f '$DEST/hawaii-coast.mp4' '$DEST
 echo "2/3 Uploading missing/updated mountain Aerial MP4s to $TV_IP..."
 for f in "$SRC"/*.mp4; do
   base="$(basename "$f")"
-  local_sz="$(stat -f%z "$f")"
+  local_sz="$(stat -f%z "$f" 2>/dev/null || stat -c%s "$f")"
   remote_sz="$(ssh "$TV_USER@$TV_IP" "stat -c%s '$DEST/$base' 2>/dev/null || echo 0")"
   if [ "$local_sz" = "$remote_sz" ]; then
     echo "  Skipping $base (already synced)"

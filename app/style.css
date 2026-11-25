@@ -23,7 +23,7 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 
 /* ---------- Home & Mountain Aerials ---------- */
 .home { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; overflow: hidden; }
-.backdrop { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; background: #0b0e12; overflow: hidden; }
+.backdrop { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; background: radial-gradient(ellipse 140% 100% at 20% 0%, #1b2b34 0%, #0d1318 65%, #080b0e 100%); overflow: hidden; }
 .aerial { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; object-fit: cover; opacity: 0; z-index: 1; transition: opacity 1400ms var(--ease); pointer-events: none; will-change: opacity; }
 .aerial.is-playing { opacity: 1; }
 .aerial.is-top { z-index: 2; }

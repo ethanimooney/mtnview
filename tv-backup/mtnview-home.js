@@ -7,7 +7,8 @@ const CONFIG = {
   logPath: "/tmp/mtnview-home.log",
   logMaxBytes: 65536,
   logKeepBytes: 16384,
-  inputDevices: ["event3", "event0"],
+  fallbackInputDevices: ["event3", "event0"],
+  maxInputDevices: 3,
   reopenDelayMs: 2000,
   hotkeyDebounceMs: 500,
   screenOffDebounceMs: 800,
@@ -192,8 +193,31 @@ function checkHdmiSignal() {
   });
 }
 
-log("daemon started (pid=" + process.pid + ")");
+function discoverInputDevices() {
+  try {
+    const raw = fs.readFileSync("/proc/bus/input/devices", "utf8");
+    const blocks = raw.split(/\n\n+/);
+    const found = [];
+    for (const blk of blocks) {
+      const nameM = /^N:\s*Name="([^"]+)"/m.exec(blk);
+      const handM = /^H:\s*Handlers=([^\n]+)/m.exec(blk);
+      if (!nameM || !handM) continue;
+      if (!/lg|magic|remote|micom|\bir\b|rc|keypad|hid/i.test(nameM[1])) continue;
+      const evM = /\bevent(\d+)\b/.exec(handM[1]);
+      if (evM) {
+        const dev = "event" + evM[1];
+        if (!found.includes(dev)) found.push(dev);
+      }
+      if (found.length >= CONFIG.maxInputDevices) break;
+    }
+    if (found.length) return found;
+  } catch (e) {}
+  return CONFIG.fallbackInputDevices;
+}
+
+const inputDevices = discoverInputDevices();
+log("daemon started (pid=" + process.pid + ", inputs=" + inputDevices.join(",") + ")");
 refreshRolePorts();
 setInterval(refreshRolePorts, CONFIG.roleRefreshMs);
 setTimeout(checkHdmiSignal, CONFIG.idlePollMs);
-for (const dev of CONFIG.inputDevices) watchDevice(dev);
+for (const dev of inputDevices) watchDevice(dev);

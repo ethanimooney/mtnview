@@ -62,9 +62,11 @@
     check: '<path d="m5.5 12.5 4 4 9-9"/>'
   };
 
+  var isUsLocale = /^en-(US|BS|KY|LR|PW)\b/i.test((navigator && navigator.language) || 'en-US');
+
   /* ---------- State ---------- */
   var S = {
-    c: { cardIdx: 0, controls: 'both', sounds: true, ambient: true, ambientSleep: '30', autoNight: true },
+    c: { cardIdx: 0, controls: 'both', sounds: true, ambient: true, ambientSleep: '30', autoNight: true, tempUnit: isUsLocale ? 'F' : 'C', clock24: !isUsLocale },
     zone: 'cards',
     cardIdx: 0,
     switching: null,
@@ -126,6 +128,8 @@
       if (typeof s.ambient === 'boolean') S.c.ambient = s.ambient;
       if (['30', '60', 'off'].indexOf(String(s.ambientSleep)) >= 0) S.c.ambientSleep = String(s.ambientSleep);
       if (typeof s.autoNight === 'boolean') S.c.autoNight = s.autoNight;
+      if (s.tempUnit === 'F' || s.tempUnit === 'C') S.c.tempUnit = s.tempUnit;
+      if (typeof s.clock24 === 'boolean') S.c.clock24 = s.clock24;
     } catch (e) { /* ignore */ }
     S.cardIdx = S.c.cardIdx;
   }
@@ -668,6 +672,14 @@
             ]
           },
           {
+            title: 'Clock & Weather',
+            horiz: true,
+            items: [
+              { action: 'toggle.clock24', label: S.c.clock24 ? '24-hour clock' : '12-hour clock' },
+              { action: 'toggle.tempUnit', label: S.c.tempUnit === 'C' ? 'Celsius (°C)' : 'Fahrenheit (°F)' }
+            ]
+          },
+          {
             title: 'Top bar style',
             horiz: true,
             items: [
@@ -719,6 +731,10 @@
       S.c.autoNight = !S.c.autoNight; nightOverride = null; savePrefs(); renderHome(); renderOverlay();
     } else if (item.action === 'toggle.sounds') {
       S.c.sounds = !S.c.sounds; savePrefs(); if (S.c.sounds) playSound('select'); renderOverlay();
+    } else if (item.action === 'toggle.clock24') {
+      S.c.clock24 = !S.c.clock24; savePrefs(); renderClock(); renderOverlay();
+    } else if (item.action === 'toggle.tempUnit') {
+      S.c.tempUnit = S.c.tempUnit === 'C' ? 'F' : 'C'; savePrefs(); renderClock(); renderOverlay();
     } else if (item.action.indexOf('ctrl.') === 0) {
       S.c.controls = item.action.slice(5); savePrefs(); renderHome(); renderOverlay();
     } else if (item.action === 'inputs.retry') {
@@ -735,17 +751,20 @@
   }
 
   /* ---------- Rendering ---------- */
+  function displayTemp(tempF) {
+    return S.c.tempUnit === 'C' ? Math.round((tempF - 32) * 5 / 9) : Math.round(tempF);
+  }
   function renderClock() {
-    var d = new Date(), h = d.getHours(), m = d.getMinutes(), ampm = h >= 12 ? 'PM' : 'AM', h12 = h % 12 || 12;
-    var timeStr = h12 + ':' + (m < 10 ? '0' : '') + m;
-    var wHtml = weatherData ? '<span class="weather">' + weatherSvg(weatherData.kind) + '<span>' + weatherData.temp + '&deg;</span></span>' : '';
-    setHTML(clockPill, wHtml + '<span class="time">' + timeStr + '</span><span class="ampm">' + ampm + '</span>');
+    var d = new Date(), h = d.getHours(), m = d.getMinutes(), ampm = h >= 12 ? 'PM' : 'AM';
+    var timeStr = S.c.clock24 ? ((h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m) : ((h % 12 || 12) + ':' + (m < 10 ? '0' : '') + m);
+    var wHtml = weatherData ? '<span class="weather">' + weatherSvg(weatherData.kind) + '<span>' + displayTemp(weatherData.temp) + '&deg;</span></span>' : '';
+    setHTML(clockPill, wHtml + '<span class="time">' + timeStr + '</span>' + (S.c.clock24 ? '' : '<span class="ampm">' + ampm + '</span>'));
     if (ambientActive) {
       var days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
       var months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
       var dateStr = days[d.getDay()] + ', ' + months[d.getMonth()] + ' ' + d.getDate();
       ambientEl.style.transform = 'translate3d(' + ambientPos.x + 'px,' + ambientPos.y + 'px,0)';
-      setHTML(ambientEl, '<div class="amb-time">' + timeStr + '<span class="amb-ampm">' + ampm + '</span></div>'
+      setHTML(ambientEl, '<div class="amb-time">' + timeStr + (S.c.clock24 ? '' : '<span class="amb-ampm">' + ampm + '</span>') + '</div>'
         + '<div class="amb-meta"><span>' + esc(dateStr) + '</span>' + (weatherData ? '<span class="amb-sep">&middot;</span>' + wHtml : '') + '</div>');
     }
   }

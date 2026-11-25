@@ -47,11 +47,11 @@ EOF
 ```
 *(You can also pass `<TV_IP>` directly as the first argument to any script instead of creating `.local/tv.env`.)*
 
-### 2. Download & convert the 6 mountain Aerials (macOS)
+### 2. Download & convert the 6 mountain Aerials (macOS, Linux, or WSL)
 ```sh
 ./scripts/download-aerials.sh
 ```
-Downloads the 6 full-length Yosemite & Scottish Highlands Apple Aerials and converts them into fast-start 720p MP4s in `app/assets/aerials/` (gitignored).
+Downloads the 6 full-length Yosemite & Scottish Highlands Apple Aerials and converts them into fast-start 720p MP4s in `app/assets/aerials/` (uses `avconvert` on macOS or `ffmpeg` on Linux/WSL).
 
 ### 3. Build & install `mtnview` on the TV
 ```sh
