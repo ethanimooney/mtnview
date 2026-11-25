@@ -1758,7 +1758,9 @@
           + '<div class="snazzy-row" id="snazzyRow" role="list"></div>');
       }
       setHTML($('snazzyTitle'), esc(active.name));
-      setHTML($('snazzyPrompt'), '<span>Press</span><span class="snazzy-ok-badge">OK</span><span>to ' + esc(active.verb) + (subPort ? ' · ' + esc(subPort) : '') + (activePowered ? ' · </span><span class="snazzy-power-tag">Powered on</span>' : '</span>'));
+      setHTML($('snazzyPrompt'), '<span>Press</span><span class="snazzy-ok-badge">OK</span><span>to ' + esc(active.verb) + '</span>'
+        + (subPort ? '<span class="snazzy-prompt-sep">&middot;</span><span>' + esc(subPort) + '</span>' : '')
+        + (activePowered ? '<span class="snazzy-prompt-sep">&middot;</span><span class="snazzy-power-tag">Powered on</span>' : ''));
       keyed($('snazzyRow'), SNAZZY_CARDS.map(function (c) { return { key: c.id, card: c }; }), function (btn, it, i) {
         var c = it.card, isSel = i === idx && cardFocus, isDim = i === idx && !cardFocus;
         var portNum = c.kind === 'hdmi' ? S.c.ports[c.id] : 0;
