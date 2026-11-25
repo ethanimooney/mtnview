@@ -1,15 +1,31 @@
-# CleanFrame
+# Agent Guidelines for mtnview
 
-`app/` is the current packaged UI. Read `docs/development.md` and `docs/interaction-behaviour.md` before app changes. For a new contributor or a separate TV installation, also read `docs/for-agents.md`.
+`mtnview` is a fork of [CleanFrame](https://github.com/nthnclrk/CleanFrame) rebuilt specifically for rooted **LG webOS** TVs (tested on LG OLED C6, webOS 11.2.0 / Rockhopper).
 
-Use simple HTML, CSS and ES5-compatible JavaScript for the TV. Node tooling can use modern JavaScript. Preserve remote focus/navigation, preference migrations and cached rendering. Read `docs/assets.md` before changing images, glass geometry or icon sizing; keep live blur and pixel analysis off the TV animation path.
+## Runtime Constraints (LG webOS Chromium)
+- **Strict ES5 in `app/`:** Keep `app/main.js` and `app/device.js` ES5-compatible (`var`, `function`, no `const`/`let`, arrow functions, or template literals).
+- **CSS compatibility in `app/style.css`:** Do **not** use CSS `inset:` or flex/grid `gap:`. Use explicit `top`/`right`/`bottom`/`left` and child margin rules (`> * + *`).
+- **`app/appinfo.json`:**
+  - Keep `"appCategory": ["home"]` as an **array** (webOS 11 `sam` rejects string values or `requiredPermissions` on fresh install).
+  - Do **not** set `"handlesRelaunch": true` unless explicitly handling activation.
+  - Bump `"version"` and reboot the TV whenever changing `app/icon*.png` so LG Home refreshes its icon cache.
 
-Run `npm run check` for app changes and `npm run check:tools` for signing or validation-tool changes. For interaction changes, run the browser preview and `CLEANFRAME_PUBLIC_FONTS=1 npm run check:browser`; public contributors must not need proprietary fonts. Run `npm run check:public` and `npm run export:public` before preparing a public download. Follow `CONTRIBUTING.md` and retain third-party notices.
+## TV Daemon Constraints (`tv-backup/`)
+- `mtnview-home.js` runs on the TV's Node runtime via `init.d/99-mtnview-home` with `UV_THREADPOOL_SIZE=8` and watches only `["event3", "event0"]` (opening 5+ blocking `/dev/input/event*` streams starves libuv's default threadpool).
+- Use `setsid` in `init.d/99-mtnview-home` so the daemon stays alive after SSH disconnects.
+- Use `luna-send -n 1` for single queries (`luna-send -i` is 4KB stdio-buffered in non-TTY pipes).
 
-Browser/repository tasks do not authorise device access. Read `docs/tv-status.md` before compatibility claims and `docs/agent-tv-setup-guide.md` before a new TV setup. An explicit device task is required even for queries that stage a helper. Announce any installation, app launch or restart; confirm visible results with the owner. Treat native Home/startup writes as a separate task with explicit authority and an exact-value recovery baseline.
+## Verification
+Before committing or deploying:
+```sh
+node --check app/main.js
+node --check app/device.js
+node --check tv-backup/mtnview-home.js
+sh -n scripts/*.sh tv-backup/init.d/*
+! grep -nE '(^|[{; ])(inset|gap):' app/style.css
+node --test scripts/test-webos-device.mjs
+node scripts/package-webos.mjs
+```
 
-On the maintainer's TV, preserve the stable package/application identity, author certificate and existing native Home assignment. For an independent user's signed build, create their own SDK-generated identity and certificates, then select them in ignored `.local/signing.json` using `signing.example.json`; read the signing section in `docs/development.md`. The generated manifest and install/launch tools use that identity; the runtime reads its own ID. Keep the source identity guards intact. Native Home targets and firmware guards need separate review and authority. The TV tools and native helper retain reference-machine assumptions; they are not an unattended installer.
-
-Keep proprietary fonts, signing keys, passwords, device identifiers, addresses, SDKs, recovery values and generated packages in ignored `.local/` or `dist/`. Never commit paid font binaries or publish a private-font widget. Public-code licensing does not replace the terms in `THIRD_PARTY_NOTICES.md`.
-
-On Nathan's Mac, use `/Users/nathan/.local/bin/gh-for-repo` for GitHub CLI work. On another machine, use the contributor's own authenticated GitHub account. Preserve shared or uncommitted work. Use reversible deletion; never reset, force-push or rewrite history without explicit authority. Publication/visibility changes require a separate instruction.
+## Privacy
+Never commit `.local/tv.env`, local TV IPs, SSH keys, `dist/*.ipk`, or `app/assets/aerials/*.mp4`.
