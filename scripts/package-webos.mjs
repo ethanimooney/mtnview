@@ -48,9 +48,6 @@ function copyTree(srcDir, relBase = '') {
 }
 
 copyTree(appDir);
-const fontCat = 'window.CleanFramePrivateFontIDs = [];\n';
-fs.writeFileSync(path.join(appTarget, 'assets/font-catalog.js'), fontCat);
-installedBytes += Buffer.byteLength(fontCat);
 
 const controlText = [
   `Package: ${appId}`,

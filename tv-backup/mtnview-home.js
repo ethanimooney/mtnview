@@ -154,40 +154,49 @@ function watchDevice(dev) {
 }
 
 // Auto-return to mtnview when any non-Apple-TV HDMI device powers off (6s grace period)
+// Checks foreground app every 5s when idle; only queries EIM every 3s while on a non-Apple-TV HDMI input.
 let watchedPort = null, wasLive = false, lostCount = 0;
-setInterval(() => {
+function checkHdmiSignal() {
   getForegroundApp((app) => {
     const m = /^com\.webos\.app\.hdmi([1-4])$/.exec(app);
-    if (!m) { watchedPort = null; wasLive = false; lostCount = 0; return; }
+    if (!m || app === rolePorts.appletv) {
+      watchedPort = null; wasLive = false; lostCount = 0;
+      setTimeout(checkHdmiSignal, 5000);
+      return;
+    }
     const port = m[1];
     if (watchedPort !== port) { watchedPort = port; wasLive = false; lostCount = 0; }
     luna("luna://com.webos.service.eim/getAllInputStatus", {}, (err, out) => {
-      if (err || !out) return;
-      try {
-        const data = JSON.parse(out);
-        updateRolePorts(data.devices);
-        const dev = (data.devices || []).find((d) => d.id === "HDMI_" + port);
-        if (!dev) return;
-        const info = deviceDesc(dev);
-        // Never auto-leave Apple TV (Apple TV CEC manages TV power directly)
-        if (/apple\s*tv/i.test(info.text)) return;
-        const live = !!(dev.hdmiSignalExist || dev.activate || (info.simplink && info.simplink.cecPower === "On"));
-        if (live) {
-          wasLive = true;
-          lostCount = 0;
-        } else if (wasLive) {
-          lostCount++;
-          if (lostCount >= 2) {
-            log("HDMI_" + port + " (" + (dev.label || "device") + ") signal lost -> returning to mtnview");
-            wasLive = false;
-            lostCount = 0;
-            launchTarget(LAUNCHER);
+      if (!err && out) {
+        try {
+          const data = JSON.parse(out);
+          updateRolePorts(data.devices);
+          const dev = (data.devices || []).find((d) => d.id === "HDMI_" + port);
+          if (dev) {
+            const info = deviceDesc(dev);
+            if (!/apple\s*tv/i.test(info.text)) {
+              const live = !!(dev.hdmiSignalExist || dev.activate || (info.simplink && info.simplink.cecPower === "On"));
+              if (live) {
+                wasLive = true;
+                lostCount = 0;
+              } else if (wasLive) {
+                lostCount++;
+                if (lostCount >= 2) {
+                  log("HDMI_" + port + " (" + (dev.label || "device") + ") signal lost -> returning to mtnview");
+                  wasLive = false;
+                  lostCount = 0;
+                  launchTarget(LAUNCHER);
+                }
+              }
+            }
           }
-        }
-      } catch (e) {}
+        } catch (e) {}
+      }
+      setTimeout(checkHdmiSignal, 3000);
     });
   });
-}, 3000);
+}
+setTimeout(checkHdmiSignal, 5000);
 
 log("daemon started (pid=" + process.pid + ")");
 refreshRolePorts();
