@@ -1026,7 +1026,7 @@
       label: axis === 'font' ? FONTS[value].name : axis === 'mode' ? MODES.filter(function (m) { return m.id === value; })[0].name : value === 'both' ? 'Both' : VALUE_NAMES[value] };
   }
   function portChoice(dev, port) {
-    return { action: 'port.' + dev + '.' + port, portDev: dev, portVal: port, disabled: false, label: port === 0 ? 'Built-in App' : 'HDMI ' + port };
+    return { action: 'port.' + dev + '.' + port, portDev: dev, portVal: port, disabled: false, label: port === 0 ? 'TV App' : 'HDMI ' + port };
   }
   function detailSections(t) {
     var flat = S.c.bg !== 'photo', inactive = !materialApplies();
@@ -2158,7 +2158,7 @@
         + command({ action: 'settings.retry', label: 'Try again' }, '<span>Try again</span>', 'setting-retry');
     }
     setHTML(appearanceStatus, status);
-    hint = selected.disabled ? '' : selected.action === 'settings.back' ? 'Return to ' + backLabel : selected.action === 'settings.retry' ? 'Retry this change' : (selected.axis || selected.portDev) ? 'Apply selected setting' : selected.action === 'background.wallpaper' ? 'Choose a wallpaper' : selected.action === 'background.rotation' ? 'Choose a rotation interval' : 'Open on the TV';
+    hint = selected.disabled ? '' : selected.action === 'settings.back' ? 'Return to ' + backLabel : selected.action === 'settings.retry' ? 'Retry this change' : (selected.axis || selected.portDev) ? 'Apply selected setting' : selected.action === 'background.wallpaper' ? 'Choose a wallpaper' : selected.action === 'background.rotation' ? 'Choose a rotation interval' : /^samsung\.(ambient|ambientSleep|autoNight|sounds|bgMotion|todWall)$/.test(selected.action) ? 'Change setting' : 'Open on the TV';
     setHTML(appearanceDesc, hint ? '<span class="remote-key">OK</span><span>' + esc(hint) + '</span>' : '');
   }
   function renderWallpaper(t) {
