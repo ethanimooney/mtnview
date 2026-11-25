@@ -5,7 +5,7 @@
   "type": "web",
   "main": "index.html",
   "title": "mtnview",
-  "appCategory": "home",
+  "appCategory": ["home"],
   "icon": "icon-80.png",
   "largeIcon": "icon-130.png",
   "bgColor": "#11161b",
