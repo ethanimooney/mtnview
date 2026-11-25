@@ -64,7 +64,7 @@ EOF
 ```sh
 ./scripts/download-aerials.sh
 ```
-Downloads the 6 full-length Yosemite & Scottish Highlands Apple Aerials and converts them into fast-start 720p MP4s in `app/assets/aerials/` (uses `avconvert` on macOS or `ffmpeg` on Linux/WSL).
+Downloads the 6 full-length Yosemite & Scottish Highlands Apple Aerials and converts them into fast-start 720p MP4s in `app/assets/aerials/` (uses `avconvert` on macOS or `ffmpeg` on Linux/WSL). *(No Apple media is bundled in this repo; videos are fetched locally for personal use. You can also drop custom MP4s + an optional `manifest.json` array of `{"src","title","sub"}` into `/media/developer/mtnview-aerials/`.)*
 
 #### 3. Build & install `mtnview` on the TV
 ```sh

@@ -3,6 +3,7 @@
   'use strict';
 
   var CONFIG = {
+    version: '1.0.1',
     prefsKey: 'mtnview.home.v1',
     weatherKey: 'mtnview.weather.v1',
     hdmiCacheKey: 'mtnview.hdmi.v1',
@@ -11,6 +12,7 @@
     ambientIdleMs: 150000,
     ambientShiftMs: 45000,
     ambientTickMs: 10000,
+    pixelShiftMs: 10 * 60000,
     inputPollMs: 15000,
     weatherCacheMs: 30 * 60000,
     weatherRefreshMs: 25 * 60000,
@@ -53,6 +55,11 @@
     { x: 140, y: 660 }, { x: 1080, y: 660 }, { x: 140, y: 160 },
     { x: 1080, y: 160 }, { x: 600, y: 420 }, { x: 320, y: 580 }
   ];
+  var PIXEL_SHIFTS = [
+    { x: 0, y: 0 }, { x: 2, y: 0 }, { x: 2, y: 2 }, { x: 0, y: 2 },
+    { x: -2, y: 2 }, { x: -2, y: 0 }, { x: -2, y: -2 }, { x: 0, y: -2 }
+  ];
+  var pixelShiftIdx = 0, pixelShiftTimer = 0;
 
   var SLEEP_NAMES = { '30': 'After 30 min', '60': 'After 60 min', off: 'Off' };
   var SVG = {
@@ -478,6 +485,39 @@
     }, CONFIG.ambientTickMs);
   }
 
+  /* ---------- Drop-In Custom Aerials Manifest (optional) ---------- */
+  function loadAerialManifest() {
+    fetchJson('assets/aerials/manifest.json', function (err, list) {
+      if (err || !Array.isArray(list) || !list.length) return;
+      var parsed = [];
+      for (var i = 0; i < list.length; i++) {
+        var it = list[i];
+        if (!it || typeof it.src !== 'string' || !it.src.trim()) continue;
+        var src = it.src.indexOf('/') >= 0 ? it.src : ('assets/aerials/' + it.src);
+        parsed.push({ src: src, title: String(it.title || 'Aerial ' + (i + 1)), sub: String(it.sub || '') });
+      }
+      if (!parsed.length) return;
+      AERIAL_MOUNTAINS = parsed;
+      aerialIdx = aerialIdx % AERIAL_MOUNTAINS.length;
+      aerialCurrentSrc = '';
+      aerialPreloadSrc = '';
+      syncAerial();
+    });
+  }
+
+  /* ---------- Subtle OLED Pixel Shift (±2px every 10 min) ---------- */
+  function startPixelShift() {
+    clearInterval(pixelShiftTimer);
+    pixelShiftTimer = setInterval(function () {
+      if (document.hidden || ambientActive || oledBlack) return;
+      pixelShiftIdx = (pixelShiftIdx + 1) % PIXEL_SHIFTS.length;
+      var p = PIXEL_SHIFTS[pixelShiftIdx];
+      var tf = 'translate3d(' + p.x + 'px,' + p.y + 'px,0)';
+      stageBody.style.transform = tf;
+      clockPill.style.transform = tf;
+    }, CONFIG.pixelShiftMs);
+  }
+
   /* ---------- Dual-Video Mountain Aerials (Single Active Decoder) ---------- */
   function currentAerial() { return AERIAL_MOUNTAINS[aerialIdx % AERIAL_MOUNTAINS.length]; }
   function nextAerialItem() { return AERIAL_MOUNTAINS[(aerialIdx + 1) % AERIAL_MOUNTAINS.length]; }
@@ -712,6 +752,28 @@
       }) : [{ action: 'apps.retry', label: S.appsLoading ? 'Loading installed apps…' : (S.appsError || 'No apps found'), disabled: S.appsLoading }];
       return { title: 'Installed Apps', sections: [{ title: '', items: appItems }] };
     }
+    if (group === 'about') {
+      return {
+        title: 'Shortcuts & About',
+        sections: [
+          {
+            title: 'Magic Remote Shortcuts',
+            items: [
+              { action: 'info.red', label: 'Red button — Screen Off', desc: 'Blank the OLED panel immediately (keeps eARC audio playing)', disabled: true },
+              { action: 'info.green', label: 'Green button — Night Dim', desc: 'Toggle dark-room dim mode anytime', disabled: true },
+              { action: 'info.yellow', label: 'Yellow / Down — Ambient Mode', desc: 'Drifting clock & Aerials (Left/Right skips scenes)', disabled: true },
+              { action: 'info.blue', label: 'Blue button — Next Aerial', desc: 'Skip to the next mountain Aerial immediately', disabled: true }
+            ]
+          },
+          {
+            title: 'About',
+            items: [
+              { action: 'info.ver', label: 'mtnview v' + CONFIG.version, desc: 'LG webOS launcher · custom Aerials via assets/aerials/manifest.json', disabled: true }
+            ]
+          }
+        ]
+      };
+    }
     return {
       title: 'LG TV',
       sections: [{
@@ -720,7 +782,8 @@
           { action: 'lgtv.apps', label: 'Installed webOS Apps', desc: 'Launch Homebrew, Plex, Jellyfin, YouTube & other TV apps' },
           { action: 'lgtv.inputs', label: 'Switch HDMI Input', desc: 'Pick any HDMI 1–4 input directly (including eARC / soundbar ports)' },
           { action: 'lgtv.settings', label: 'LG TV Settings', desc: 'Picture, sound and network settings' },
-          { action: 'lgtv.home', label: 'LG webOS Home', desc: 'Open LG’s stock Home screen' }
+          { action: 'lgtv.home', label: 'LG webOS Home', desc: 'Open LG’s stock Home screen' },
+          { action: 'lgtv.about', label: 'Shortcuts & About', desc: 'Magic Remote color keys & mtnview v' + CONFIG.version }
         ]
       }]
     };
@@ -773,6 +836,8 @@
       openDetail('inputs');
     } else if (item.action === 'lgtv.settings') {
       FrameDevice.settings(function () {});
+    } else if (item.action === 'lgtv.about') {
+      openDetail('about');
     } else if (item.action === 'lgtv.home') {
       FrameDevice.home(function () {});
     }
@@ -1087,8 +1152,10 @@
   render();
   focusStage();
   updateClock();
+  loadAerialManifest();
   pollInputs();
   fetchWeather();
   startAmbientLoop();
+  startPixelShift();
   if (window.FrameDevice && FrameDevice.inhibitScreenSaver) FrameDevice.inhibitScreenSaver();
 })();
