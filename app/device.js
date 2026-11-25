@@ -1,40 +1,13 @@
 /* LG webOS TV Luna Service bridge (PalmServiceBridge / webOS.service). */
 (function () {
   'use strict';
-  var IDS = {
-    stremio: 'com.stremio.app',
-    netflix: 'netflix',
-    disneyplus: 'com.disney.disneyplus-prod',
-    youtube: 'youtube.leanback.v4',
-    appletv: 'com.apple.appletv',
-    primevideo: 'amazon',
-    abciview: 'au.net.abc.iview',
-    sbs: 'au.com.sbs.ondemand',
-    applemusic: 'com.apple.applemusic'
+
+  var CONFIG = {
+    selfId: 'com.mtnview.launcher',
+    defaultTimeoutMs: 8000,
+    eimTimeoutMs: 6000,
+    powerTimeoutMs: 5000
   };
-  var STREAMING = [
-    'netflix', 'youtube.leanback.v4', 'com.apple.appletv', 'com.disney.disneyplus-prod',
-    'amazon', 'spotify-beehive', 'com.stremio.app', 'com.apple.applemusic',
-    'hulu', 'com.hbo.hbomax', 'com.wbd.stream', 'com.peacocktv.peacock',
-    'com.cbs.app', 'com.espn.score_center', 'tv.twitch.tv.starshot.lg',
-    'com.tubitv.webos', 'plex', 'com.plexapp.webos', 'com.jellyfin.webos',
-    'org.webosbrew.hbchannel', 'youtube.leanback.kids.v4'
-  ];
-  var EXTRA_BRANDS = {
-    'spotify-beehive': 'spotify',
-    'com.hbo.hbomax': 'hbomax',
-    'com.wbd.stream': 'hbomax',
-    'com.tubitv.webos': 'tubi'
-  };
-  var INTERNAL = [
-    'com.webos.app.home', 'com.webos.app.livetv', 'com.webos.app.hdmi1',
-    'com.webos.app.hdmi2', 'com.webos.app.hdmi3', 'com.webos.app.hdmi4',
-    'com.palm.app.settings', 'com.webos.app.setting', 'com.webos.app.connectionwizard',
-    'com.webos.app.notificationcenter', 'com.webos.app.voice', 'com.webos.app.screensaver',
-    'com.webos.app.factorywin', 'com.webos.app.softwareupdate', 'com.webos.app.self-diagnosis',
-    'com.webos.app.quicksettings', 'com.webos.app.inputcommon'
-  ];
-  var SELF = 'com.mtnview.launcher';
 
   function hasLuna() {
     return !!(
@@ -42,18 +15,21 @@
       typeof window.PalmServiceBridge === 'function'
     );
   }
+
   function selfId() {
     try {
       if (window.webOSSystem && window.webOSSystem.identifier) return window.webOSSystem.identifier;
     } catch (err) { /* ignore */ }
-    return SELF;
+    return CONFIG.selfId;
   }
+
   function unavailable(done) {
     done({
       message: 'Open mtnview on your LG TV to use this control.',
       detail: 'The web preview cannot control the TV.'
     });
   }
+
   function failure(err, fallbackMsg) {
     var detail = '';
     if (err) detail = err.errorText || err.message || err.name || (err.errorCode ? 'Error ' + err.errorCode : '');
@@ -62,11 +38,12 @@
       detail: detail || 'Try again, or press the Home button on your LG remote.'
     };
   }
-  function luna(service, method, params, done, timeout) {
+
+  function luna(service, method, params, done, timeoutMs) {
     var finished = false, bridge = null, req = null;
     var timer = setTimeout(function () {
       finish({ message: 'The TV did not respond. Please try again.' });
-    }, timeout || 8000);
+    }, timeoutMs || CONFIG.defaultTimeoutMs);
 
     function finish(err, res) {
       if (finished) return;
@@ -104,8 +81,7 @@
           if (res && res.returnValue === false) finish(failure(res));
           else finish(null, res || {});
         };
-        var uri = service.replace(/\/$/, '') + '/' + method;
-        bridge.call(uri, JSON.stringify(params || {}));
+        bridge.call(service.replace(/\/$/, '') + '/' + method, JSON.stringify(params || {}));
       } catch (err) {
         finish(failure(err));
       }
@@ -117,6 +93,7 @@
     return function () {};
   }
 
+  /* ---------- HDMI Input Discovery & Switching ---------- */
   var sourceCancel = null;
   function cancelSource() { if (sourceCancel) sourceCancel(); }
 
@@ -147,7 +124,6 @@
     if (!hasLuna()) { unavailable(done); return; }
     luna('luna://com.webos.service.eim', 'getAllInputStatus', {}, function (err, res) {
       if (err || !res || !Array.isArray(res.devices)) {
-        /* Fallback to standard LG OLED 4-port HDMI list if EIM query is restricted in Dev Mode. */
         done(null, defaultHdmiList());
         return;
       }
@@ -191,7 +167,7 @@
       if (!list.length) { done(null, defaultHdmiList()); return; }
       list.sort(function (a, b) { return a.number - b.number; });
       done(null, list);
-    }, 6000);
+    }, CONFIG.eimTimeoutMs);
   }
 
   function setSource(port, done) {
@@ -219,7 +195,6 @@
     cancelInner = luna('luna://com.webos.applicationManager', 'launch', { id: hdmiAppId }, function (err) {
       if (finished) return;
       if (!err) { finish(null, { number: port, name: 'HDMI ' + port, appId: hdmiAppId }); return; }
-      /* Fallback to EIM switchInput if launching com.webos.app.hdmiN is rejected. */
       cancelInner = luna('luna://com.webos.service.eim', 'switchInput', { inputId: 'HDMI_' + port }, function (eimErr) {
         if (finished) return;
         if (!eimErr) finish(null, { number: port, name: 'HDMI ' + port, appId: hdmiAppId });
@@ -228,16 +203,12 @@
     });
   }
 
+  /* ---------- System Apps & Power Control ---------- */
   function launchApp(id, done) {
     if (!hasLuna()) { unavailable(done); return; }
     luna('luna://com.webos.applicationManager', 'launch', { id: id }, function (err) {
       done(err ? failure(err) : null);
     });
-  }
-
-  function launch(brand, done) {
-    if (!IDS[brand]) { done({ message: 'This app has no launch target.' }); return; }
-    launchApp(IDS[brand], done);
   }
 
   function home(done) {
@@ -252,35 +223,6 @@
         done(err2 ? failure(err2, 'Could not open LG TV settings.') : null);
       });
     });
-  }
-
-  function apps(done) {
-    if (!hasLuna()) { unavailable(done); return; }
-    luna('luna://com.webos.applicationManager', 'listLaunchPoints', {}, function (err, res) {
-      if (err) { done(err); return; }
-      var list = (res && Array.isArray(res.launchPoints)) ? res.launchPoints : [];
-      var known = {}, seen = {}, result = [], self = selfId();
-      Object.keys(IDS).forEach(function (brand) { known[IDS[brand]] = brand; });
-      list.forEach(function (a) {
-        if (!a || !a.id) return;
-        var id = a.id, name = a.title || a.name || '';
-        var primary = !!known[id], stream = STREAMING.indexOf(id) >= 0;
-        if (id === self || INTERNAL.indexOf(id) >= 0 || seen[id] || !name) return;
-        if (!primary && !stream && a.visible === false) return;
-        if (!primary && /^com\.webos\.app\.hdmi\d+$/i.test(id)) return;
-        if (!primary && /(?:service|worker|preview|plugin|test|sdk|factory|daemon|overlay)/i.test(name + ' ' + id)) return;
-        seen[id] = true;
-        result.push({
-          appId: id,
-          name: name,
-          brand: known[id] || EXTRA_BRANDS[id] || '',
-          icon: a.largeIcon || a.icon || '',
-          rank: primary ? Object.keys(IDS).indexOf(known[id]) : (stream ? 20 : 30)
-        });
-      });
-      result.sort(function (a, b) { return a.rank - b.rank || a.name.toLowerCase().localeCompare(b.name.toLowerCase()); });
-      done(null, result);
-    }, 20000);
   }
 
   var screenSaverBridge = null;
@@ -310,6 +252,7 @@
       }));
     } catch (e) { screenSaverBridge = null; }
   }
+
   function allowScreenSaver() {
     if (!screenSaverBridge) return;
     try { if (typeof screenSaverBridge.cancel === 'function') screenSaverBridge.cancel(); } catch (e) { /* ignore */ }
@@ -324,16 +267,14 @@
       luna('luna://com.webos.service.tvpower', 'power/turnOffScreen', {}, function (err2) {
         cb(err2 ? failure(err2, 'Could not turn off the screen.') : null);
       });
-    }, 5000);
+    }, CONFIG.powerTimeoutMs);
   }
 
   window.FrameDevice = {
     platform: 'webos',
-    launch: launch,
     launchApp: launchApp,
     home: home,
     settings: settings,
-    apps: apps,
     sources: sources,
     setSource: setSource,
     cancelSource: cancelSource,

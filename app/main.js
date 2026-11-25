@@ -2,10 +2,32 @@
 (function () {
   'use strict';
 
-  var PREFS_KEY = 'mtnview.home.v1';
-  var WEATHER_KEY = 'mtnview.weather.v1';
-  var HDMI_CACHE_KEY = 'mtnview.hdmi.v1';
-  var AMBIENT_IDLE_MS = 150000;
+  var CONFIG = {
+    prefsKey: 'mtnview.home.v1',
+    weatherKey: 'mtnview.weather.v1',
+    hdmiCacheKey: 'mtnview.hdmi.v1',
+    stageWidth: 1920,
+    stageHeight: 1080,
+    ambientIdleMs: 150000,
+    ambientShiftMs: 45000,
+    ambientTickMs: 10000,
+    inputPollMs: 15000,
+    weatherCacheMs: 30 * 60000,
+    weatherRefreshMs: 25 * 60000,
+    weatherRetryMs: 15 * 60000,
+    nightStartHour: 21,
+    nightEndHour: 6,
+    aerialPreloadSec: 6,
+    aerialCrossfadeLeadSec: 1.2,
+    aerialFadeUnloadMs: 1500,
+    aerialTransitionTimeoutMs: 6000,
+    locationToastMs: 8000,
+    toastMs: 2400
+  };
+  var PREFS_KEY = CONFIG.prefsKey;
+  var WEATHER_KEY = CONFIG.weatherKey;
+  var HDMI_CACHE_KEY = CONFIG.hdmiCacheKey;
+  var AMBIENT_IDLE_MS = CONFIG.ambientIdleMs;
 
   var KEYS = {
     37: 'left', 38: 'up', 39: 'right', 40: 'down',
@@ -285,7 +307,7 @@
         }
       });
     }
-    hdmiPollTimer = setTimeout(pollInputs, 15000);
+    hdmiPollTimer = setTimeout(pollInputs, CONFIG.inputPollMs);
   }
 
   /* ---------- Weather ---------- */
@@ -325,16 +347,16 @@
     weatherData = { temp: Math.round(tempF), kind: kind || 'cloud', ts: Date.now() };
     try { localStorage.setItem(WEATHER_KEY, JSON.stringify(weatherData)); } catch (e) { /* ignore */ }
     renderClock();
-    weatherTimer = setTimeout(fetchWeather, 30 * 60000);
+    weatherTimer = setTimeout(fetchWeather, CONFIG.weatherCacheMs);
   }
   function fetchWeather() {
     clearTimeout(weatherTimer);
     try {
       var raw = localStorage.getItem(WEATHER_KEY), d = raw ? JSON.parse(raw) : null;
-      if (d && typeof d.temp === 'number' && d.kind && Date.now() - d.ts < 30 * 60000) weatherData = d;
+      if (d && typeof d.temp === 'number' && d.kind && Date.now() - d.ts < CONFIG.weatherCacheMs) weatherData = d;
     } catch (e) { /* ignore */ }
-    if (weatherData && Date.now() - weatherData.ts < 25 * 60000) {
-      weatherTimer = setTimeout(fetchWeather, 30 * 60000);
+    if (weatherData && Date.now() - weatherData.ts < CONFIG.weatherRefreshMs) {
+      weatherTimer = setTimeout(fetchWeather, CONFIG.weatherCacheMs);
       return;
     }
     fetchJson('https://wttr.in/?format=j1', function (err, data) {
@@ -343,7 +365,7 @@
       if (isFinite(tempF)) { saveWeather(tempF, wwoKind(cur.weatherCode)); return; }
       fetchJson('https://get.geojs.io/v1/ip/geo.json', function (gErr, geo) {
         var lat = geo ? parseFloat(geo.latitude) : NaN, lon = geo ? parseFloat(geo.longitude) : NaN;
-        if (gErr || !isFinite(lat) || !isFinite(lon)) { weatherTimer = setTimeout(fetchWeather, 15 * 60000); return; }
+        if (gErr || !isFinite(lat) || !isFinite(lon)) { weatherTimer = setTimeout(fetchWeather, CONFIG.weatherRetryMs); return; }
         fetchJson('https://api.met.no/weatherapi/locationforecast/2.0/compact?lat=' + lat.toFixed(3) + '&lon=' + lon.toFixed(3), function (mErr, m) {
           var ts = m && m.properties && m.properties.timeseries && m.properties.timeseries[0];
           var inst = ts && ts.data && ts.data.instant && ts.data.instant.details;
@@ -351,7 +373,7 @@
           if (!mErr && inst && typeof inst.air_temperature === 'number') {
             var kind = /clear|fair/.test(sym) ? 'clear' : /snow|sleet/.test(sym) ? 'snow' : /rain|drizzle|shower/.test(sym) ? 'rain' : 'cloud';
             saveWeather(inst.air_temperature * 9 / 5 + 32, kind);
-          } else weatherTimer = setTimeout(fetchWeather, 15 * 60000);
+          } else weatherTimer = setTimeout(fetchWeather, CONFIG.weatherRetryMs);
         });
       });
     });
@@ -362,13 +384,13 @@
     if (nightOverride !== null) return nightOverride;
     if (!S.c.autoNight) return false;
     var hr = new Date().getHours();
-    return hr >= 21 || hr < 6;
+    return hr >= CONFIG.nightStartHour || hr < CONFIG.nightEndHour;
   }
   function showToast(msg) {
     clearTimeout(toastTimer);
     toastEl.textContent = msg;
     toastEl.className = 'toast is-on';
-    toastTimer = setTimeout(function () { toastEl.className = 'toast'; }, 2400);
+    toastTimer = setTimeout(function () { toastEl.className = 'toast'; }, CONFIG.toastMs);
   }
   function touchActivity() {
     lastActivity = Date.now();
@@ -415,14 +437,14 @@
           enterOledSleep();
           return;
         }
-        if (now - ambientShiftAt >= 45000) {
+        if (now - ambientShiftAt >= CONFIG.ambientShiftMs) {
           ambientShiftAt = now;
           ambientSpotIdx = (ambientSpotIdx + 1) % AMBIENT_SPOTS.length;
           ambientPos = AMBIENT_SPOTS[ambientSpotIdx];
           ambientEl.style.transform = 'translate3d(' + ambientPos.x + 'px,' + ambientPos.y + 'px,0)';
         }
       }
-    }, 10000);
+    }, CONFIG.ambientTickMs);
   }
 
   /* ---------- Dual-Video Mountain Aerials (Single Active Decoder) ---------- */
@@ -434,7 +456,7 @@
     clearTimeout(locTimer);
     setHTML(locEl, '<span class="loc-title">' + esc(item.title) + '</span><span class="loc-sub">' + esc(item.sub) + '</span>');
     locEl.className = 'loc is-on';
-    locTimer = setTimeout(function () { locEl.className = 'loc'; }, 8000);
+    locTimer = setTimeout(function () { locEl.className = 'loc'; }, CONFIG.locationToastMs);
   }
   function preloadNextAerial() {
     var next = nextAerialItem(), standby = aerialVids[1 - aerialSlot];
@@ -480,7 +502,7 @@
     var nextVid = aerialVids[nextSlot], oldVid = aerialCurrentSrc ? curVid : null;
     aerialTransitioning = true;
     clearTimeout(aerialTransTimer);
-    aerialTransTimer = setTimeout(function () { aerialTransitioning = false; }, 6000);
+    aerialTransTimer = setTimeout(function () { aerialTransitioning = false; }, CONFIG.aerialTransitionTimeoutMs);
     aerialCurrentSrc = item.src;
     nextVid.preload = 'auto';
     nextVid.muted = true;
@@ -508,7 +530,7 @@
             oldVid.removeAttribute('src');
             try { oldVid.load(); } catch (e) { /* ignore */ }
           }
-        }, 1500);
+        }, CONFIG.aerialFadeUnloadMs);
       }
     }
     nextVid.onplaying = reveal;
@@ -519,8 +541,8 @@
     nextVid.ontimeupdate = function () {
       if (aerialSlot !== nextSlot || !nextVid.duration || isNaN(nextVid.duration)) return;
       var left = nextVid.duration - nextVid.currentTime;
-      if (left <= 6 && left > 1.5) preloadNextAerial();
-      else if (left <= 1.2 && !aerialTransitioning) stepAerial(1);
+      if (left <= CONFIG.aerialPreloadSec && left > CONFIG.aerialCrossfadeLeadSec + 0.3) preloadNextAerial();
+      else if (left <= CONFIG.aerialCrossfadeLeadSec && !aerialTransitioning) stepAerial(1);
     };
     nextVid.onended = function () { if (aerialSlot === nextSlot) stepAerial(1); };
     nextVid.onerror = function () { aerialTransitioning = false; nextVid.className = 'aerial'; };
@@ -909,10 +931,10 @@
 
   /* ---------- Lifecycle ---------- */
   function fit() {
-    var scale = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    var scale = Math.min(window.innerWidth / CONFIG.stageWidth, window.innerHeight / CONFIG.stageHeight);
     stage.style.transform = 'scale(' + scale + ')';
-    stage.style.left = ((window.innerWidth - 1920 * scale) / 2) + 'px';
-    stage.style.top = ((window.innerHeight - 1080 * scale) / 2) + 'px';
+    stage.style.left = ((window.innerWidth - CONFIG.stageWidth * scale) / 2) + 'px';
+    stage.style.top = ((window.innerHeight - CONFIG.stageHeight * scale) / 2) + 'px';
   }
   function focusStage() { try { stage.focus({ preventScroll: true }); } catch (e) { stage.focus(); } }
   function onWake() {

@@ -1,36 +1,46 @@
+/* Rooted LG webOS daemon: dynamic remote hotkeys, global OLED screen-off, and non-Apple-TV HDMI auto-return. */
 const fs = require("fs");
 const { execFile } = require("child_process");
 
-const LAUNCHER = "com.mtnview.launcher";
-const LOG_PATH = "/tmp/mtnview-home.log";
-const LOG_MAX_BYTES = 65536;
-
-// Remote hotkeys: resolve target HDMI port dynamically from live EIM metadata (with sensible defaults)
-const HOTKEYS = {
-  1037: { role: "appletv", fallback: "com.webos.app.hdmi1", cancel: "netflix" },
-  1038: { role: "ps5", fallback: "com.webos.app.hdmi3", cancel: "amazon" },
-  1042: { role: "switch", fallback: "com.webos.app.hdmi4", cancel: "com.disney.disneyplus-prod" }
+const CONFIG = {
+  launcherId: "com.mtnview.launcher",
+  logPath: "/tmp/mtnview-home.log",
+  logMaxBytes: 65536,
+  logKeepBytes: 16384,
+  inputDevices: ["event3", "event0"],
+  reopenDelayMs: 2000,
+  hotkeyDebounceMs: 500,
+  screenOffDebounceMs: 800,
+  idlePollMs: 5000,
+  activeHdmiPollMs: 3000,
+  signalLostTicks: 2, // 2 x 3s = 6s grace period before returning to mtnview
+  roleRefreshMs: 60000,
+  // Linux evdev keycodes -> target role (auto-resolved from EIM) and stock app to cancel
+  hotkeys: {
+    1037: { role: "appletv", fallback: "com.webos.app.hdmi1", cancel: "netflix" },
+    1038: { role: "ps5", fallback: "com.webos.app.hdmi3", cancel: "amazon" },
+    1042: { role: "switch", fallback: "com.webos.app.hdmi4", cancel: "com.disney.disneyplus-prod" }
+  },
+  screenOffKey: 1043, // LG Channels button -> OLED Screen Off (works globally for eARC/soundbar audio)
+  blockKeys: { 1133: true, 1137: true } // News, YouTube
 };
-const SCREEN_OFF_KEY = 1043; // LG Channels button -> OLED Screen Off (works globally, great for Sonos audio)
-const BLOCK_KEYS = { 1133: true, 1137: true };
-const sz = process.arch === "arm64" ? 24 : 16;
-let lastPress = 0;
+
+const EV_SIZE = process.arch === "arm64" ? 24 : 16;
 const rolePorts = { appletv: "com.webos.app.hdmi1", ps5: "com.webos.app.hdmi3", switch: "com.webos.app.hdmi4" };
+let lastPress = 0;
 
 function log(msg) {
   try {
     try {
-      const st = fs.statSync(LOG_PATH);
-      if (st.size > LOG_MAX_BYTES) {
-        const tail = fs.readFileSync(LOG_PATH, "utf8").slice(-16384);
-        fs.writeFileSync(LOG_PATH, tail);
+      if (fs.statSync(CONFIG.logPath).size > CONFIG.logMaxBytes) {
+        fs.writeFileSync(CONFIG.logPath, fs.readFileSync(CONFIG.logPath, "utf8").slice(-CONFIG.logKeepBytes));
       }
     } catch (e) {}
-    fs.appendFileSync(LOG_PATH, new Date().toISOString() + " " + msg + "\n");
+    fs.appendFileSync(CONFIG.logPath, new Date().toISOString() + " " + msg + "\n");
   } catch (e) {}
 }
 
-process.on("uncaughtException", (err) => log("ERR: " + (err && err.stack || err)));
+process.on("uncaughtException", (err) => log("ERR: " + ((err && err.stack) || err)));
 setInterval(() => {}, 30000);
 
 function luna(uri, params, cb) {
@@ -81,28 +91,43 @@ function refreshRolePorts() {
   });
 }
 
+/* Cancel any unwanted app launched by a blocked/remapped remote button and stay on the current app. */
+function enforceStayOn(delays, matchRe) {
+  getForegroundApp((stayOn) => {
+    for (const ms of delays) {
+      setTimeout(() => {
+        getForegroundApp((cur) => {
+          if (cur && stayOn && cur !== stayOn && (!matchRe || matchRe.test(cur))) {
+            luna("luna://com.webos.applicationManager/closeByAppId", { id: cur }, () => launchTarget(stayOn));
+          }
+        });
+      }, ms);
+    }
+  });
+}
+
 function watchDevice(dev) {
-  const s = fs.createReadStream("/dev/input/" + dev);
+  const stream = fs.createReadStream("/dev/input/" + dev);
   let reopened = false;
   function reopen() {
     if (reopened) return;
     reopened = true;
-    setTimeout(() => watchDevice(dev), 2000);
+    setTimeout(() => watchDevice(dev), CONFIG.reopenDelayMs);
   }
-  s.on("error", reopen);
-  s.on("close", reopen);
-  s.on("data", (b) => {
-    for (let i = 0; i + sz <= b.length; i += sz) {
-      const type = b.readUInt16LE(i + sz - 8);
-      const code = b.readUInt16LE(i + sz - 6);
-      const val = b.readInt32LE(i + sz - 4);
+  stream.on("error", reopen);
+  stream.on("close", reopen);
+  stream.on("data", (buf) => {
+    for (let i = 0; i + EV_SIZE <= buf.length; i += EV_SIZE) {
+      const type = buf.readUInt16LE(i + EV_SIZE - 8);
+      const code = buf.readUInt16LE(i + EV_SIZE - 6);
+      const val = buf.readInt32LE(i + EV_SIZE - 4);
       if (type !== 1 || val !== 1) continue;
 
-      if (HOTKEYS[code]) {
-        const now = Date.now();
-        if (now - lastPress < 500) continue;
+      const now = Date.now();
+      if (CONFIG.hotkeys[code]) {
+        if (now - lastPress < CONFIG.hotkeyDebounceMs) continue;
         lastPress = now;
-        const hk = HOTKEYS[code];
+        const hk = CONFIG.hotkeys[code];
         const target = rolePorts[hk.role] || hk.fallback;
         launchTarget(target);
         for (const ms of [450, 1200, 2200]) {
@@ -112,56 +137,29 @@ function watchDevice(dev) {
             });
           }, ms);
         }
-      } else if (code === SCREEN_OFF_KEY) {
-        const now = Date.now();
-        if (now - lastPress < 800) continue;
+      } else if (code === CONFIG.screenOffKey) {
+        if (now - lastPress < CONFIG.screenOffDebounceMs) continue;
         lastPress = now;
         log("screen-off shortcut pressed");
         luna("luna://com.webos.service.tvpower/power/turnOffScreen", { standbyMode: "active" });
-        getForegroundApp((stayOn) => {
-          for (const ms of [400, 1200]) {
-            setTimeout(() => {
-              getForegroundApp((cur) => {
-                if (cur && stayOn && cur !== stayOn && /livetv|channel/i.test(cur)) {
-                  luna("luna://com.webos.applicationManager/closeByAppId", { id: cur }, () => {
-                    launchTarget(stayOn);
-                  });
-                }
-              });
-            }, ms);
-          }
-        });
-      } else if (BLOCK_KEYS[code]) {
-        const now = Date.now();
-        if (now - lastPress < 500) continue;
+        enforceStayOn([400, 1200], /livetv|channel/i);
+      } else if (CONFIG.blockKeys[code]) {
+        if (now - lastPress < CONFIG.hotkeyDebounceMs) continue;
         lastPress = now;
-        getForegroundApp((stayOn) => {
-          for (const ms of [350, 1000, 2000]) {
-            setTimeout(() => {
-              getForegroundApp((cur) => {
-                if (cur && stayOn && cur !== stayOn) {
-                  luna("luna://com.webos.applicationManager/closeByAppId", { id: cur }, () => {
-                    launchTarget(stayOn);
-                  });
-                }
-              });
-            }, ms);
-          }
-        });
+        enforceStayOn([350, 1000, 2000], null);
       }
     }
   });
 }
 
-// Auto-return to mtnview when any non-Apple-TV HDMI device powers off (6s grace period)
-// Checks foreground app every 5s when idle; only queries EIM every 3s while on a non-Apple-TV HDMI input.
+/* Auto-return to mtnview when any non-Apple-TV HDMI console powers off. */
 let watchedPort = null, wasLive = false, lostCount = 0;
 function checkHdmiSignal() {
   getForegroundApp((app) => {
     const m = /^com\.webos\.app\.hdmi([1-4])$/.exec(app);
     if (!m || app === rolePorts.appletv) {
       watchedPort = null; wasLive = false; lostCount = 0;
-      setTimeout(checkHdmiSignal, 5000);
+      setTimeout(checkHdmiSignal, CONFIG.idlePollMs);
       return;
     }
     const port = m[1];
@@ -179,26 +177,23 @@ function checkHdmiSignal() {
               if (live) {
                 wasLive = true;
                 lostCount = 0;
-              } else if (wasLive) {
-                lostCount++;
-                if (lostCount >= 2) {
-                  log("HDMI_" + port + " (" + (dev.label || "device") + ") signal lost -> returning to mtnview");
-                  wasLive = false;
-                  lostCount = 0;
-                  launchTarget(LAUNCHER);
-                }
+              } else if (wasLive && ++lostCount >= CONFIG.signalLostTicks) {
+                log("HDMI_" + port + " (" + (dev.label || "device") + ") signal lost -> returning to mtnview");
+                wasLive = false;
+                lostCount = 0;
+                launchTarget(CONFIG.launcherId);
               }
             }
           }
         } catch (e) {}
       }
-      setTimeout(checkHdmiSignal, 3000);
+      setTimeout(checkHdmiSignal, CONFIG.activeHdmiPollMs);
     });
   });
 }
-setTimeout(checkHdmiSignal, 5000);
 
 log("daemon started (pid=" + process.pid + ")");
 refreshRolePorts();
-setInterval(refreshRolePorts, 60000);
-for (const dev of ["event3", "event0"]) watchDevice(dev);
+setInterval(refreshRolePorts, CONFIG.roleRefreshMs);
+setTimeout(checkHdmiSignal, CONFIG.idlePollMs);
+for (const dev of CONFIG.inputDevices) watchDevice(dev);

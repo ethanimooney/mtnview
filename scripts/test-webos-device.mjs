@@ -115,30 +115,6 @@ test('settings falls back from com.palm.app.settings to com.webos.app.setting', 
   });
 });
 
-test('apps filters out internal webOS apps, HDMI inputs, and self', (_, done) => {
-  class MockBridge {
-    call() {
-      setTimeout(() => this.onservicecallback(JSON.stringify({
-        returnValue: true,
-        launchPoints: [
-          { id: 'com.mtnview.launcher', title: 'mtnview' },
-          { id: 'com.webos.app.hdmi1', title: 'HDMI 1' },
-          { id: 'com.webos.app.home', title: 'Home' },
-          { id: 'netflix', title: 'Netflix' },
-          { id: 'com.apple.appletv', title: 'Apple TV' },
-          { id: 'org.webosbrew.hbchannel', title: 'Homebrew Channel' }
-        ]
-      })), 0);
-    }
-  }
-  const dev = loadDevice({ PalmServiceBridge: MockBridge });
-  dev.apps((err, list) => {
-    assert.equal(err, null);
-    assert.deepEqual(Array.from(list, (a) => a.appId), ['netflix', 'com.apple.appletv', 'org.webosbrew.hbchannel']);
-    done();
-  });
-});
-
 test('inhibitScreenSaver registers and replies ack:false on Active', () => {
   const calls = [];
   class MockBridge {
