@@ -68,13 +68,42 @@
   var BG_MOTION_NAMES = { aerial: 'Aerial video', kenburns: 'Motion photos', static: 'Static' };
   var AMBIENT_IDLE_MS = 150000;
   var WEATHER_KEY = 'mtnview.weather.v1';
+  var HDMI_CACHE_KEY = 'mtnview.hdmi.v1';
   var SNAZZY_DEFAULT_PORTS = { appletv: 1, ps5: 3, switch: 4 };
-  var SNAZZY_CARDS = [
-    { id: 'appletv', name: 'Apple TV', verb: 'watch', kind: 'hdmi', wall: 'misty' },
-    { id: 'ps5', name: 'PS5', verb: 'play', kind: 'hdmi', wall: 'forest' },
-    { id: 'switch', name: 'Nintendo Switch', verb: 'play', kind: 'hdmi', wall: 'alpine' },
-    { id: 'tvsettings', name: 'TV Settings', verb: 'open', kind: 'settings', wall: 'peaks' }
+  var SNAZZY_DEFAULT_CARDS = [
+    { id: 'hdmi-1', port: 1, name: 'Apple TV', icon: 'appletv', verb: 'watch', kind: 'hdmi' },
+    { id: 'hdmi-3', port: 3, name: 'PS5', icon: 'ps5', verb: 'play', kind: 'hdmi' },
+    { id: 'hdmi-4', port: 4, name: 'Nintendo Switch', icon: 'switch', verb: 'play', kind: 'hdmi' },
+    { id: 'tvsettings', port: 0, name: 'TV Settings', icon: 'tvsettings', verb: 'open', kind: 'settings' }
   ];
+  var liveCards = null;
+  function loadCachedHdmiNames() {
+    try {
+      var raw = localStorage.getItem(HDMI_CACHE_KEY);
+      var parsed = raw ? JSON.parse(raw) : null;
+      return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch (e) { return {}; }
+  }
+  function saveCachedHdmiNames(map) {
+    try { localStorage.setItem(HDMI_CACHE_KEY, JSON.stringify(map)); } catch (e) { /* ignore */ }
+  }
+  function detectCardIcon(name, serviceType) {
+    var s = String(name || '').toLowerCase();
+    if (/apple\s*tv/.test(s)) return 'appletv';
+    if (/ps[345]|playstation/.test(s)) return 'ps5';
+    if (/switch|nintendo/.test(s)) return 'switch';
+    if (/xbox/.test(s)) return 'xbox';
+    if (/steam|pc|mac|computer/.test(s) || serviceType === 'game') return 'steam';
+    if (serviceType === 'ott' || /roku|chromecast|shield|fire\s*tv/.test(s)) return 'streaming';
+    return 'hdmi';
+  }
+  function detectCardVerb(iconId, serviceType) {
+    if (iconId === 'ps5' || iconId === 'switch' || iconId === 'xbox' || iconId === 'steam' || serviceType === 'game') return 'play';
+    return 'watch';
+  }
+  function snazzyCards() {
+    return (liveCards && liveCards.length) ? liveCards : SNAZZY_DEFAULT_CARDS;
+  }
   var MSG = {
     leave: { title: 'Leave Home?', line: 'Open LG Home?', note: '', actions: [['stay', 'Stay'], ['samsung', 'LG Home']] }
   };
@@ -381,7 +410,7 @@
       font: pick(modern.font, LOOK_VALUES.font, 'inter'), wall: wall(modern.wall || s.wallpaper) ? modern.wall || s.wallpaper : WALLS[0].id,
       home: h, recent: recent, lastApp: h.indexOf(s.lastApp) >= 0 ? s.lastApp : h[0],
       mode: pick(s.mode, MODES.map(function (m) { return m.id; }), 'fixed'),
-      cardIdx: typeof s.cardIdx === 'number' && s.cardIdx >= 0 && s.cardIdx < SNAZZY_CARDS.length ? Math.floor(s.cardIdx) : 0,
+      cardIdx: typeof s.cardIdx === 'number' && s.cardIdx >= 0 && s.cardIdx < 5 ? Math.floor(s.cardIdx) : 0,
       sounds: s.sounds === false ? false : true,
       todWall: s.todWall === false ? false : true,
       ambient: s.ambient === false ? false : true,
@@ -608,30 +637,23 @@
   }
 
   function activateCard(idx) {
-    var card = SNAZZY_CARDS[idx], c;
+    var cards = snazzyCards(), card = cards[idx], c;
     if (!card || busy || S.switching) return;
     playUiSound('select');
     c = next(S.c.home.slice(), S.c.recent.slice()); c.cardIdx = idx; write(c, 'Selected device');
-    S.switching = { id: card.id, name: card.name, kind: card.kind, port: S.c.ports[card.id] || 1, status: 'switching', error: null };
+    var port = card.kind === 'hdmi' ? (card.port || 1) : 0;
+    S.switching = { id: card.icon || card.id, name: card.name, kind: card.kind, port: port, status: 'switching', error: null };
     render();
     if (card.kind === 'settings') {
       FrameDevice.settings(function (err) {
-        if (!S.switching || S.switching.id !== card.id) return;
+        if (!S.switching || S.switching.name !== card.name) return;
         if (err) { S.switching.status = 'error'; S.switching.error = err.message || 'Could not open TV settings.'; render(); }
       });
     } else if (card.kind === 'hdmi') {
-      var port = S.c.ports[card.id] || 1;
-      if (port === 0) {
-        FrameDevice.launchApp('com.apple.appletv', function (err) {
-          if (!S.switching || S.switching.id !== card.id) return;
-          if (err) { S.switching.status = 'error'; S.switching.error = err.message || 'Could not launch Apple TV app.'; render(); }
-        });
-      } else {
-        FrameDevice.setSource(port, function (err) {
-          if (!S.switching || S.switching.id !== card.id) return;
-          if (err && !err.cancelled) { S.switching.status = 'error'; S.switching.error = err.message || ('Could not switch to HDMI ' + port + '.'); render(); }
-        });
-      }
+      FrameDevice.setSource(port, function (err) {
+        if (!S.switching || S.switching.port !== port) return;
+        if (err && !err.cancelled) { S.switching.status = 'error'; S.switching.error = err.message || ('Could not switch to HDMI ' + port + '.'); render(); }
+      });
     }
   }
   function cancelSwitching() {
@@ -692,7 +714,7 @@
     },
     point: function (t, z, i) {
       if (z === 'snazzy-back') { playUiSound('back'); cancelSwitching(); return; }
-      if (z === 'snazzy-card') { t.f.zone = 'apps'; S.cardIdx = clamp(i, 0, SNAZZY_CARDS.length - 1); activateCard(S.cardIdx); return; }
+      if (z === 'snazzy-card') { t.f.zone = 'apps'; S.cardIdx = clamp(i, 0, snazzyCards().length - 1); activateCard(S.cardIdx); return; }
       if (z === 'util') { t.f.zone = 'util'; t.f.u = i; S.lastUtil = i; }
       else if (z === 'app') { t.f.zone = 'apps'; setSel(S.c.home[i]); }
       else if (z === 'empty') t.f.zone = 'apps';
@@ -701,7 +723,7 @@
     }
   };
   function cardsHomeKey(t, k, U) {
-    var f = t.f, n = SNAZZY_CARDS.length;
+    var f = t.f, n = snazzyCards().length;
     if (S.switching) {
       if (k === 'back') { playUiSound('back'); cancelSwitching(); }
       else if (k === 'ok' && S.switching.status === 'error') activateCard(S.cardIdx);
@@ -985,11 +1007,12 @@
   function mode() { for (var i = 0; i < MODES.length; i++) if (MODES[i].id === S.c.mode) return MODES[i]; return MODES[0]; }
   function settingsRows() {
     if (S.c.layout === 'cards') {
+      var hdmiCount = snazzyCards().filter(function (c) { return c.kind === 'hdmi'; }).length;
       return [
-        { id: 'devices', label: 'Device HDMI Ports', value: 'HDMI 1, 3 & 4' },
+        { id: 'inputs', label: 'HDMI Inputs', value: hdmiCount + ' auto-detected · switch any port' },
         { id: 'motion', label: 'Mountain Aerials', value: currentAerialItem().title + ' · ' + AERIAL_MOUNTAINS.length + ' scenes' },
         { id: 'preferences', label: 'Ambient & Audio', value: (S.c.ambient !== false ? 'OLED ambient on' : 'Ambient off') + ' · ' + (S.c.sounds !== false ? 'Sounds on' : 'Muted') },
-        { id: 'samsung', label: 'LG TV', value: 'Inputs, TV settings & LG Home' }
+        { id: 'samsung', label: 'LG TV', value: 'TV settings & LG Home' }
       ];
     }
     var n = S.c.home.length;
@@ -1016,6 +1039,7 @@
   };
   function settingsOk(id) {
     if (id === 'editor') openEditor('settings');
+    else if (id === 'inputs') openInputs();
     else openAppearance(id);
   }
   var DETAIL_NAMES = { background: 'Background', layout: 'Layout', typography: 'Typography', focus: 'Focus', rotation: 'Rotation', samsung: 'LG TV', inputs: 'Inputs', devices: 'Device Ports', motion: 'Mountain Aerials', preferences: 'Ambient & Audio' };
@@ -1035,7 +1059,8 @@
       { id: 'switch_port', title: 'Nintendo Switch', horizontal: true, items: [1, 2, 3, 4].map(function (p) { return portChoice('switch', p); }) }
     ];
     if (t.group === 'inputs') return [{ id: 'inputs', title: '', items: t.inputs.length ? t.inputs.map(function (input) {
-      return { action: 'input.' + input.number, label: input.name, description: input.active ? 'Active' : input.connected ? 'Connected' : 'Disconnected — may be asleep' };
+      var st = input.isAudio ? 'Audio / eARC (hidden on Home)' : input.active ? 'Powered on · HDMI ' + input.number : input.connected ? 'Standby · HDMI ' + input.number : input.pluggedIn ? 'Asleep · HDMI ' + input.number : 'Not plugged in · HDMI ' + input.number;
+      return { action: 'input.' + input.number, label: input.name, description: st };
     }) : [{ action: 'inputs.retry', label: t.loading ? 'Loading inputs…' : 'Try again', disabled: t.loading }],
       reason: t.inputError || (!t.loading && !t.inputs.length ? 'No HDMI inputs were reported by this TV.' : '') }];
     if (t.group === 'background') return [
@@ -1077,7 +1102,7 @@
     ] }];
   }
   function detailRows(t) {
-    var rows = [[{ action: 'settings.back', label: t.group === 'rotation' ? 'Background' : t.group === 'inputs' ? 'LG TV' : 'Settings' }]];
+    var rows = [[{ action: 'settings.back', label: t.group === 'rotation' ? 'Background' : (t.group === 'inputs' && S.c.layout !== 'cards') ? 'LG TV' : 'Settings' }]];
     detailSections(t).forEach(function (section) {
       var enabled = section.items.filter(function (item) { return !item.disabled; });
       if (section.horizontal && enabled.length) rows.push(enabled);
@@ -1348,6 +1373,24 @@
         + '<path fill="currentColor" fill-rule="evenodd" d="M37 20C25.4 20 16 29.4 16 41v38c0 11.6 9.4 21 21 21h15c1.7 0 3-1.3 3-3V23c0-1.7-1.3-3-3-3H37zm10 7.5H37c-7.5 0-13.5 6-13.5 13.5v38c0 7.5 6 13.5 13.5 13.5h10v-65zM36.5 54a8.5 8.5 0 1 0 0-17 8.5 8.5 0 0 0 0 17zm31.5-34c-1.7 0-3 1.3-3 3v74c0 1.7 1.3 3 3 3h15c11.6 0 21-9.4 21-21V41c0-11.6-9.4-21-21-21H68zm14.5 54a9 9 0 1 1 0-18 9 9 0 0 1 0 18z"/>'
         + '</svg>';
     }
+    if (id === 'xbox') {
+      return '<svg class="snazzy-svg" viewBox="0 0 120 120" aria-hidden="true">'
+        + '<circle cx="60" cy="60" r="38" fill="none" stroke="currentColor" stroke-width="6"/>'
+        + '<path fill="none" stroke="currentColor" stroke-width="6" stroke-linecap="round" d="M36 38c14 10 34 30 48 48M84 38c-14 10-34 30-48 48"/>'
+        + '</svg>';
+    }
+    if (id === 'streaming') {
+      return '<svg class="snazzy-svg" viewBox="0 0 120 120" aria-hidden="true">'
+        + '<rect x="18" y="28" width="84" height="64" rx="14" fill="none" stroke="currentColor" stroke-width="6"/>'
+        + '<polygon points="50,45 50,75 76,60" fill="currentColor"/>'
+        + '</svg>';
+    }
+    if (id === 'hdmi') {
+      return '<svg class="snazzy-svg" viewBox="0 0 120 120" aria-hidden="true">'
+        + '<path fill="none" stroke="currentColor" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" d="M20 42h80v22l-12 14H32L20 64V42z"/>'
+        + '<line x1="36" y1="58" x2="84" y2="58" stroke="currentColor" stroke-width="6" stroke-linecap="round"/>'
+        + '</svg>';
+    }
     if (id === 'steam') {
       return '<svg class="snazzy-svg" viewBox="0 0 120 120" aria-hidden="true">'
         + '<path fill="none" stroke="currentColor" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" d="M36 38h48c12.2 0 22 9.8 22 22 0 6.8-3.1 13.2-8.4 17.4l-7.2 5.7c-3.9 3.1-9.6 2.3-12.5-1.8l-5.8-8.3H47.9l-5.8 8.3c-2.9 4.1-8.6 4.9-12.5 1.8l-7.2-5.7C17.1 73.2 14 66.8 14 60c0-12.2 9.8-22 22-22z"/>'
@@ -1407,6 +1450,42 @@
     if (S.c.todWall !== false) return timeOfDayWalls()[aerialIdx % 4] || 'forest';
     return 'misty';
   }
+  function buildLiveCards(list) {
+    var cache = loadCachedHdmiNames(), cacheChanged = false, cards = [], i, item, generic, name, iconId;
+    for (i = 0; i < list.length; i++) {
+      item = list[i];
+      if (!item || !item.number || item.isAudio) continue;
+      if (!item.pluggedIn && !item.connected && !item.active) continue;
+      generic = /^hdmi[\s_-]*\d*$/i.test(String(item.name || '').trim());
+      if (!generic && item.name) {
+        name = item.name;
+        if (!cache[item.number] || cache[item.number].name !== name || cache[item.number].serviceType !== item.serviceType) {
+          cache[item.number] = { name: name, serviceType: item.serviceType || '' };
+          cacheChanged = true;
+        }
+      } else if (cache[item.number] && cache[item.number].name) {
+        name = cache[item.number].name;
+      } else {
+        name = 'HDMI ' + item.number;
+      }
+      var stype = item.serviceType || (cache[item.number] && cache[item.number].serviceType) || '';
+      iconId = detectCardIcon(name, stype);
+      cards.push({
+        id: 'hdmi-' + item.number,
+        port: item.number,
+        name: name,
+        icon: iconId,
+        verb: detectCardVerb(iconId, stype),
+        kind: 'hdmi'
+      });
+    }
+    if (cacheChanged) saveCachedHdmiNames(cache);
+    cards.push({ id: 'tvsettings', port: 0, name: 'TV Settings', icon: 'tvsettings', verb: 'open', kind: 'settings' });
+    return cards;
+  }
+  function cardsSig(list) {
+    return list.map(function (c) { return c.id + ':' + c.name + ':' + c.icon; }).join('|');
+  }
   function pollCardInputs() {
     clearTimeout(hdmiPollTimer);
     if (document.hidden || S.c.layout !== 'cards') return;
@@ -1416,16 +1495,22 @@
           var nextMap = {}, changed = false, i, item, prev;
           for (i = 0; i < list.length; i++) {
             item = list[i];
-            nextMap[item.number] = { connected: !!item.connected, active: !!item.active };
+            nextMap[item.number] = { connected: !!item.connected, active: !!item.active, pluggedIn: !!item.pluggedIn, isAudio: !!item.isAudio };
             prev = hdmiStatus[item.number];
-            if (!prev || prev.connected !== !!item.connected || prev.active !== !!item.active) changed = true;
+            if (!prev || prev.connected !== !!item.connected || prev.active !== !!item.active || prev.pluggedIn !== !!item.pluggedIn) changed = true;
           }
           hdmiStatus = nextMap;
+          var nextCards = buildLiveCards(list);
+          if (!liveCards || cardsSig(liveCards) !== cardsSig(nextCards)) {
+            liveCards = nextCards;
+            S.cardIdx = clamp(S.cardIdx || 0, 0, liveCards.length - 1);
+            changed = true;
+          }
           if (changed && top().id === 'home' && S.c.layout === 'cards') renderSnazzyCards(homeState(top()));
         }
       });
     }
-    hdmiPollTimer = setTimeout(pollCardInputs, 20000);
+    hdmiPollTimer = setTimeout(pollCardInputs, 15000);
   }
   function weatherSvg(kind) {
     if (kind === 'clear') {
@@ -1705,8 +1790,9 @@
   }
   function renderSnazzyCards(hs) {
     ensureSnazzyDOM();
-    var idx = clamp(typeof S.cardIdx === 'number' ? S.cardIdx : 0, 0, SNAZZY_CARDS.length - 1);
-    var active = SNAZZY_CARDS[idx], t = top(), d = new Date(), h = d.getHours(), m = d.getMinutes(), ampm = h >= 12 ? 'PM' : 'AM', h12 = h % 12 || 12;
+    var cards = snazzyCards();
+    var idx = clamp(typeof S.cardIdx === 'number' ? S.cardIdx : 0, 0, cards.length - 1);
+    var active = cards[idx], t = top(), d = new Date(), h = d.getHours(), m = d.getMinutes(), ampm = h >= 12 ? 'PM' : 'AM', h12 = h % 12 || 12;
     var timeStr = h12 + ':' + (m < 10 ? '0' : '') + m;
     var sw = S.switching, cardFocus = hs.zone === 'apps';
     var activeWall = snazzyWallForCard(active, idx, t);
@@ -1747,10 +1833,10 @@
         + '</button>'
         + '</div>');
     } else {
-      var subPort = active.kind === 'hdmi' ? (S.c.ports[active.id] === 0 ? 'App' : 'HDMI ' + S.c.ports[active.id]) : '';
-      var activePortNum = active.kind === 'hdmi' ? S.c.ports[active.id] : 0;
+      var subPort = active.kind === 'hdmi' ? ('HDMI ' + active.port) : '';
+      var activePortNum = active.kind === 'hdmi' ? active.port : 0;
       var activePortSt = activePortNum ? hdmiStatus[activePortNum] : null;
-      var activePowered = !!(activePortSt && (activePortSt.active || activePortSt.connected));
+      var activePowered = !!(activePortSt && activePortSt.active);
       if (!bodyEl.querySelector('.snazzy-row')) {
         setHTML(bodyEl, '<div class="snazzy-hero">'
           + '<h1 class="snazzy-title" id="snazzyTitle"></h1>'
@@ -1758,23 +1844,26 @@
           + '</div>'
           + '<div class="snazzy-row" id="snazzyRow" role="list"></div>');
       }
+      var rowEl = $('snazzyRow');
+      rowEl.className = 'snazzy-row' + (cards.length >= 5 ? ' is-five' : '');
       setHTML($('snazzyTitle'), esc(active.name));
       setHTML($('snazzyPrompt'), '<span>Press</span><span class="snazzy-ok-badge">OK</span><span>to ' + esc(active.verb) + '</span>'
         + (subPort ? '<span class="snazzy-prompt-sep">&middot;</span><span>' + esc(subPort) + '</span>' : '')
         + (activePowered ? '<span class="snazzy-prompt-sep">&middot;</span><span class="snazzy-power-tag">Powered on</span>' : ''));
-      keyed($('snazzyRow'), SNAZZY_CARDS.map(function (c) { return { key: c.id, card: c }; }), function (btn, it, i) {
+      keyed(rowEl, cards.map(function (c) { return { key: c.id, card: c }; }), function (btn, it, i) {
         var c = it.card, isSel = i === idx && cardFocus, isDim = i === idx && !cardFocus;
-        var portNum = c.kind === 'hdmi' ? S.c.ports[c.id] : 0;
+        var portNum = c.kind === 'hdmi' ? c.port : 0;
         var st = portNum ? hdmiStatus[portNum] : null;
-        var dotCls = st && st.active ? ' is-active' : (st && st.connected ? ' is-on' : '');
-        setContent(btn, c.id + '|' + dotCls, function () {
+        var dotCls = st && st.active ? ' is-active' : '';
+        var iconId = c.icon || c.id;
+        setContent(btn, c.id + '|' + c.name + '|' + iconId + '|' + dotCls, function () {
           return (dotCls ? '<span class="snazzy-dot' + dotCls + '" aria-hidden="true"></span>' : '')
-            + '<span class="snazzy-card-art">' + snazzyIllus(c.id) + '</span>'
+            + '<span class="snazzy-card-art">' + snazzyIllus(iconId) + '</span>'
             + '<span class="snazzy-card-label">' + esc(c.name) + '</span>';
         });
         btn.type = 'button';
         btn.tabIndex = -1;
-        btn.className = 'snazzy-card card-' + c.id + (isSel ? ' is-focus' : '') + (isDim ? ' is-sel' : '');
+        btn.className = 'snazzy-card card-' + iconId + (isSel ? ' is-focus' : '') + (isDim ? ' is-sel' : '');
         btn.setAttribute('aria-label', c.name);
         attrs(btn, 'snazzy-card', i, 'snazzy.card.' + c.id);
       }, 'button');
@@ -2135,7 +2224,7 @@
         + ' data-z="detail" data-i="0" data-id="' + item.action + '" data-action="' + item.action + '">' + inner
         + (isRadio ? '<span class="setting-tick" aria-hidden="true">' + (applied ? icon('check') : '') + '</span>' : '') + '</button>';
     }
-    var backLabel = t.group === 'rotation' ? 'Background' : t.group === 'inputs' ? 'LG TV' : 'Settings';
+    var backLabel = t.group === 'rotation' ? 'Background' : (t.group === 'inputs' && S.c.layout !== 'cards') ? 'LG TV' : 'Settings';
     setHTML(appearanceBack, command({ action: 'settings.back', label: backLabel }, icon('left') + '<span>' + backLabel + '</span>', 'setting-back'));
     setHTML(appearanceRows, detailSections(t).map(function (section) {
       return '<section class="setting-section' + (section.horizontal ? ' is-horizontal' : '') + ' section-' + section.id + '">'

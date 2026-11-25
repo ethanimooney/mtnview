@@ -64,24 +64,28 @@ test('falls back to EIM switchInput if hdmi app launch fails', (_, done) => {
   });
 });
 
-test('sources parses EIM devices and falls back to 4 HDMI ports on permission error', async () => {
+test('sources parses EIM devices, CEC metadata, audio/ARC flag, and falls back on permission error', async () => {
   class EimOkBridge {
     call(uri) {
       assert.equal(uri, 'luna://com.webos.service.eim/getAllInputStatus');
       setTimeout(() => this.onservicecallback(JSON.stringify({
         returnValue: true,
         devices: [
-          { id: 'HDMI_2', label: 'Switch', connected: true, active: false, appId: 'com.webos.app.hdmi2' },
-          { id: 'HDMI_1', label: 'Apple TV', connected: true, active: true, appId: 'com.webos.app.hdmi1' }
+          { id: 'HDMI_3', label: 'PS5 Game Console', connected: true, activate: false, hdmiPlugIn: true, subList: [{ id: 'URCU', serviceType: 'game', brandName: 'PS5' }] },
+          { id: 'HDMI_2', label: 'Sonos Sound Bar', connected: true, activate: true, hdmiPlugIn: true, subList: [{ id: 'SIMPLINK', osdName: 'Sonos Beam', cecpDevType: 5 }, { id: 'URCU', serviceType: 'audio', connectedInput: 'ARC' }] },
+          { id: 'HDMI_1', label: 'AppleTV', connected: true, activate: true, hdmiPlugIn: true, subList: [{ id: 'SIMPLINK', osdName: 'Apple TV', cecPower: 'On' }] },
+          { id: 'HDMI_4', label: 'HDMI 4', connected: false, activate: false, hdmiPlugIn: true, subList: [] }
         ]
       })), 0);
     }
   }
   const dev1 = loadDevice({ PalmServiceBridge: EimOkBridge });
   const list1 = await new Promise((resolve, reject) => dev1.sources((err, res) => (err ? reject(err) : resolve(res))));
-  assert.deepEqual(Array.from(list1, (x) => [x.number, x.name, x.active]), [
-    [1, 'Apple TV', true],
-    [2, 'Switch', false]
+  assert.deepEqual(Array.from(list1, (x) => [x.number, x.name, x.active, x.isAudio, x.pluggedIn]), [
+    [1, 'Apple TV', true, false, true],
+    [2, 'Sonos Beam', true, true, true],
+    [3, 'PS5', false, false, true],
+    [4, 'HDMI 4', false, false, true]
   ]);
 
   class EimDeniedBridge {
