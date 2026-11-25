@@ -1,0 +1,25 @@
+#!/bin/sh
+(
+  sleep 4
+  luna-send -n 1 'luna://com.webos.applicationManager/launch' '{"id":"com.cleanframe.launcher"}' >/dev/null 2>&1
+
+  LAST_STATE=""
+  luna-send -i 'luna://com.webos.service.tvpower/power/getPowerState' '{"subscribe":true}' 2>/dev/null | while IFS= read -r line; do
+    case "$line" in
+      *'"Active"'*)
+        if [ "$LAST_STATE" != "Active" ]; then
+          LAST_STATE="Active"
+          sleep 2
+          FG=$(luna-send -n 1 'luna://com.webos.applicationManager/getForegroundAppInfo' '{}' 2>/dev/null)
+          case "$FG" in
+            *'com.webos.app.hdmi1'*) ;;
+            *) luna-send -n 1 'luna://com.webos.applicationManager/launch' '{"id":"com.cleanframe.launcher"}' >/dev/null 2>&1 ;;
+          esac
+        fi
+        ;;
+      *'"state"'*)
+        LAST_STATE="Standby"
+        ;;
+    esac
+  done
+) &

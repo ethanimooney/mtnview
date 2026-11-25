@@ -1,0 +1,7 @@
+#!/bin/sh
+if [ -f /tmp/cleanframe-home.pid ]; then
+  kill $(cat /tmp/cleanframe-home.pid) 2>/dev/null
+fi
+NODE_BIN=$(which node 2>/dev/null || echo /usr/bin/node)
+UV_THREADPOOL_SIZE=8 nohup "$NODE_BIN" /var/lib/webosbrew/cleanframe-home.js >>/tmp/cleanframe-home.log 2>&1 </dev/null &
+echo $! > /tmp/cleanframe-home.pid

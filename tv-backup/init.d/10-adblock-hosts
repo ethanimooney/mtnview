@@ -1,0 +1,18 @@
+#!/bin/sh
+cp /etc/hosts /tmp/cleanframe-hosts
+cat << "HOSTS" >> /tmp/cleanframe-hosts
+0.0.0.0 ad.lgappstv.com
+0.0.0.0 us.ad.lgsmartad.com
+0.0.0.0 us.info.lgsmartad.com
+0.0.0.0 lgad.cjpowercast.com
+0.0.0.0 us.rdx2.lgtvsdp.com
+0.0.0.0 rdx2.lgtvsdp.com
+0.0.0.0 smartclip.net
+0.0.0.0 smartclip.com
+0.0.0.0 yumenetworks.com
+0.0.0.0 snu.lge.com
+0.0.0.0 su.lge.com
+0.0.0.0 su-ssl.lge.com
+0.0.0.0 su-dev.lge.com
+HOSTS
+mount --bind /tmp/cleanframe-hosts /etc/hosts
