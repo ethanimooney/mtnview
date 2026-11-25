@@ -22,12 +22,9 @@
     aerialFadeUnloadMs: 1500,
     aerialTransitionTimeoutMs: 6000,
     locationToastMs: 8000,
-    toastMs: 2400
+    toastMs: 2400,
+    wakeDebounceMs: 300
   };
-  var PREFS_KEY = CONFIG.prefsKey;
-  var WEATHER_KEY = CONFIG.weatherKey;
-  var HDMI_CACHE_KEY = CONFIG.hdmiCacheKey;
-  var AMBIENT_IDLE_MS = CONFIG.ambientIdleMs;
 
   var KEYS = {
     37: 'left', 38: 'up', 39: 'right', 40: 'down',
@@ -85,7 +82,7 @@
   var weatherData = null, weatherTimer = 0, clockTimer = 0;
   var lastActivity = Date.now(), ambientActive = false, oledBlack = false, ambientEnteredAt = 0;
   var ambientShiftAt = 0, ambientSpotIdx = 0, ambientPos = AMBIENT_SPOTS[0], ambientTickTimer = 0;
-  var nightOverride = null, toastTimer = 0, heldKeys = {};
+  var nightOverride = null, toastTimer = 0, heldKeys = {}, lastWakeAt = 0;
 
   var aerialSlot = 0, aerialIdx = Math.floor(Math.random() * AERIAL_MOUNTAINS.length);
   var aerialCurrentSrc = '', aerialPreloadSrc = '', aerialTransitioning = false, aerialTransTimer = 0;
@@ -108,13 +105,13 @@
   /* ---------- Preferences ---------- */
   function loadPrefs() {
     try {
-      var raw = localStorage.getItem(PREFS_KEY);
+      var raw = localStorage.getItem(CONFIG.prefsKey);
       if (!raw) return;
       var s = JSON.parse(raw);
       if (!s || typeof s !== 'object') return;
-      var look = s.look && typeof s.look === 'object' ? s.look : s;
+      var ctrl = s.controls || (s.look && s.look.controls);
       if (typeof s.cardIdx === 'number' && s.cardIdx >= 0 && s.cardIdx < 5) S.c.cardIdx = Math.floor(s.cardIdx);
-      if (['icons', 'both', 'text'].indexOf(look.controls) >= 0) S.c.controls = look.controls;
+      if (['icons', 'both', 'text'].indexOf(ctrl) >= 0) S.c.controls = ctrl;
       if (typeof s.sounds === 'boolean') S.c.sounds = s.sounds;
       if (typeof s.ambient === 'boolean') S.c.ambient = s.ambient;
       if (['30', '60', 'off'].indexOf(String(s.ambientSleep)) >= 0) S.c.ambientSleep = String(s.ambientSleep);
@@ -123,18 +120,7 @@
     S.cardIdx = S.c.cardIdx;
   }
   function savePrefs() {
-    try {
-      var out = {
-        cardIdx: S.c.cardIdx,
-        controls: S.c.controls,
-        sounds: S.c.sounds,
-        ambient: S.c.ambient,
-        ambientSleep: S.c.ambientSleep,
-        autoNight: S.c.autoNight,
-        look: { controls: S.c.controls }
-      };
-      localStorage.setItem(PREFS_KEY, JSON.stringify(out));
-    } catch (e) { /* ignore */ }
+    try { localStorage.setItem(CONFIG.prefsKey, JSON.stringify(S.c)); } catch (e) { /* ignore */ }
   }
 
   /* ---------- Tactile UI Audio (Web Audio API) ---------- */
@@ -233,13 +219,13 @@
   /* ---------- Live Dynamic HDMI Inputs ---------- */
   function loadHdmiCache() {
     try {
-      var raw = localStorage.getItem(HDMI_CACHE_KEY);
+      var raw = localStorage.getItem(CONFIG.hdmiCacheKey);
       var parsed = raw ? JSON.parse(raw) : null;
       return parsed && typeof parsed === 'object' ? parsed : {};
     } catch (e) { return {}; }
   }
   function saveHdmiCache(map) {
-    try { localStorage.setItem(HDMI_CACHE_KEY, JSON.stringify(map)); } catch (e) { /* ignore */ }
+    try { localStorage.setItem(CONFIG.hdmiCacheKey, JSON.stringify(map)); } catch (e) { /* ignore */ }
   }
   function detectIcon(name, serviceType) {
     var s = String(name || '').toLowerCase();
@@ -345,14 +331,14 @@
   }
   function saveWeather(tempF, kind) {
     weatherData = { temp: Math.round(tempF), kind: kind || 'cloud', ts: Date.now() };
-    try { localStorage.setItem(WEATHER_KEY, JSON.stringify(weatherData)); } catch (e) { /* ignore */ }
+    try { localStorage.setItem(CONFIG.weatherKey, JSON.stringify(weatherData)); } catch (e) { /* ignore */ }
     renderClock();
     weatherTimer = setTimeout(fetchWeather, CONFIG.weatherCacheMs);
   }
   function fetchWeather() {
     clearTimeout(weatherTimer);
     try {
-      var raw = localStorage.getItem(WEATHER_KEY), d = raw ? JSON.parse(raw) : null;
+      var raw = localStorage.getItem(CONFIG.weatherKey), d = raw ? JSON.parse(raw) : null;
       if (d && typeof d.temp === 'number' && d.kind && Date.now() - d.ts < CONFIG.weatherCacheMs) weatherData = d;
     } catch (e) { /* ignore */ }
     if (weatherData && Date.now() - weatherData.ts < CONFIG.weatherRefreshMs) {
@@ -429,7 +415,7 @@
         return;
       }
       var now = Date.now();
-      if (!ambientActive && now - lastActivity >= AMBIENT_IDLE_MS) {
+      if (!ambientActive && now - lastActivity >= CONFIG.ambientIdleMs) {
         enterAmbient();
       } else if (ambientActive && !oledBlack) {
         var mins = S.c.ambientSleep === 'off' ? 0 : (parseInt(S.c.ambientSleep, 10) || 30);
@@ -743,6 +729,7 @@
     syncAerial();
 
     if (sw) {
+      stageBody._mode = 'sw';
       var verb = sw.kind === 'settings' ? 'Opening' : 'Switching to';
       var portNote = sw.kind === 'hdmi' ? (' · HDMI ' + sw.port) : '';
       setHTML(stageBody, '<div class="switching">'
@@ -756,23 +743,39 @@
       return;
     }
 
+    /* Keep persistent hero & card DOM nodes so CSS focus transitions animate smoothly at 60fps. */
+    var sig = cardsSig(list);
+    if (stageBody._mode !== 'cards' || stageBody._sig !== sig) {
+      stageBody._mode = 'cards';
+      stageBody._sig = sig;
+      stageBody._h = null;
+      stageBody.innerHTML = '<div class="hero"><h1 class="hero-title" id="heroTitle"></h1><p class="prompt" id="heroPrompt"></p></div>'
+        + '<div class="card-row' + (list.length >= 5 ? ' is-five' : '') + '" id="cardRow" role="list">'
+        + list.map(function (c, i) {
+          return '<button type="button" tabindex="-1" class="card" data-z="card" data-i="' + i + '" aria-label="' + esc(c.name) + '">'
+            + '<span class="dot" hidden aria-hidden="true"></span>'
+            + '<span class="card-art">' + devSvg(c.icon) + '</span>'
+            + '<span class="card-label">' + esc(c.name) + '</span></button>';
+        }).join('') + '</div>';
+    }
     var subPort = active.kind === 'hdmi' ? ('HDMI ' + active.port) : '';
     var st = active.kind === 'hdmi' ? hdmiStatus[active.port] : null;
     var powered = !!(st && st.active);
-    var rowHtml = list.map(function (c, i) {
-      var isSel = i === S.cardIdx && cardFocus, isDim = i === S.cardIdx && !cardFocus;
-      var cSt = c.kind === 'hdmi' ? hdmiStatus[c.port] : null;
-      var dot = (cSt && cSt.active) ? '<span class="dot" aria-hidden="true"></span>' : '';
-      return '<button type="button" tabindex="-1" class="card' + (isSel ? ' is-focus' : '') + (isDim ? ' is-sel' : '') + '" data-z="card" data-i="' + i + '" aria-label="' + esc(c.name) + '">'
-        + dot + '<span class="card-art">' + devSvg(c.icon) + '</span><span class="card-label">' + esc(c.name) + '</span></button>';
-    }).join('');
-    setHTML(stageBody, '<div class="hero">'
-      + '<h1 class="hero-title">' + esc(active.name) + '</h1>'
-      + '<p class="prompt"><span>Press</span><span class="ok-badge">OK</span><span>to ' + esc(active.verb) + '</span>'
+    var heroTitleEl = $('heroTitle'), heroPromptEl = $('heroPrompt'), cardRowEl = $('cardRow');
+    if (heroTitleEl && heroTitleEl.textContent !== active.name) heroTitleEl.textContent = active.name;
+    setHTML(heroPromptEl, '<span>Press</span><span class="ok-badge">OK</span><span>to ' + esc(active.verb) + '</span>'
       + (subPort ? '<span class="prompt-sep">&middot;</span><span>' + esc(subPort) + '</span>' : '')
-      + (powered ? '<span class="prompt-sep">&middot;</span><span class="power-tag">Powered on</span>' : '')
-      + '</p></div>'
-      + '<div class="card-row' + (list.length >= 5 ? ' is-five' : '') + '" role="list">' + rowHtml + '</div>');
+      + (powered ? '<span class="prompt-sep">&middot;</span><span class="power-tag">Powered on</span>' : ''));
+    if (cardRowEl) {
+      var btns = cardRowEl.children;
+      for (var i = 0; i < btns.length && i < list.length; i++) {
+        var c = list[i], isSel = i === S.cardIdx && cardFocus, isDim = i === S.cardIdx && !cardFocus;
+        var cSt = c.kind === 'hdmi' ? hdmiStatus[c.port] : null;
+        var cls = 'card' + (isSel ? ' is-focus' : '') + (isDim ? ' is-sel' : '');
+        if (btns[i].className !== cls) btns[i].className = cls;
+        if (btns[i].firstChild) btns[i].firstChild.hidden = !(cSt && cSt.active);
+      }
+    }
   }
 
   function renderOverlay() {
@@ -851,7 +854,7 @@
       else if (k === 'right') { if (S.cardIdx < n - 1) { S.cardIdx++; playSound('move'); renderHome(); } else playSound('edge'); }
       else if (k === 'up') { S.zone = 'util'; playSound('move'); renderHome(); }
       else if (k === 'down') { playSound('move'); enterAmbient(); }
-      else if (k === 'back') { playSound('back'); S.view = 'leave'; S.leaveIdx = 0; renderOverlay(); }
+      else if (k === 'back') { playSound('back'); S.view = 'leave'; S.leaveIdx = 0; render(); }
       else if (k === 'ok') { activateCard(S.cardIdx); }
       return;
     }
@@ -938,6 +941,9 @@
   }
   function focusStage() { try { stage.focus({ preventScroll: true }); } catch (e) { stage.focus(); } }
   function onWake() {
+    var now = Date.now();
+    if (now - lastWakeAt < CONFIG.wakeDebounceMs) return;
+    lastWakeAt = now;
     touchActivity(); cancelSwitching(); pollInputs();
     if (window.FrameDevice && FrameDevice.inhibitScreenSaver) FrameDevice.inhibitScreenSaver();
     focusStage(); render(); updateClock();

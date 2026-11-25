@@ -2,11 +2,6 @@
 # Auto-launch mtnview on boot and Quick Start+ wake,
 # UNLESS the TV was woken directly by Apple TV (or another active HDMI device via CEC).
 
-if [ -f /tmp/mtnview-wake.pid ]; then
-  kill $(cat /tmp/mtnview-wake.pid) 2>/dev/null || true
-fi
-pkill -f "tvpower/power/getPowerState" 2>/dev/null || true
-
 NODE_BIN=$(which node 2>/dev/null || echo /usr/bin/node)
 
 maybe_launch() {
@@ -48,25 +43,39 @@ maybe_launch() {
   ' >/dev/null 2>&1
 }
 
-(
-  # Boot check: wait briefly for CEC Active Source to settle before deciding
+WATCH_CMD='
   sleep 4
-  maybe_launch
-
+  '"$0"' --check
   LAST_STATE=""
-  luna-send -i 'luna://com.webos.service.tvpower/power/getPowerState' '{"subscribe":true}' 2>/dev/null | while IFS= read -r line; do
+  luna-send -i "luna://com.webos.service.tvpower/power/getPowerState" "{\"subscribe\":true}" 2>/dev/null | while IFS= read -r line; do
     case "$line" in
-      *'"Active"'*)
+      *"\"Active\""*)
         if [ "$LAST_STATE" != "Active" ]; then
           LAST_STATE="Active"
           sleep 3
-          maybe_launch
+          '"$0"' --check
         fi
         ;;
-      *'"state"'*)
+      *"\"state\""*)
         LAST_STATE="Standby"
         ;;
     esac
   done
-) </dev/null >/dev/null 2>&1 &
+'
+
+if [ "$1" = "--check" ]; then
+  maybe_launch
+  exit 0
+fi
+
+if [ -f /tmp/mtnview-wake.pid ]; then
+  kill $(cat /tmp/mtnview-wake.pid) 2>/dev/null || true
+fi
+pkill -f "tvpower/power/getPowerState" 2>/dev/null || true
+
+if command -v setsid >/dev/null 2>&1; then
+  setsid sh -c "$WATCH_CMD" </dev/null >/dev/null 2>&1 &
+else
+  nohup sh -c "$WATCH_CMD" </dev/null >/dev/null 2>&1 &
+fi
 echo $! > /tmp/mtnview-wake.pid

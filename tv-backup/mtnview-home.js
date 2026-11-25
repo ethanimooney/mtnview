@@ -41,7 +41,6 @@ function log(msg) {
 }
 
 process.on("uncaughtException", (err) => log("ERR: " + ((err && err.stack) || err)));
-setInterval(() => {}, 30000);
 
 function luna(uri, params, cb) {
   execFile("/usr/bin/luna-send", ["-n", "1", uri, JSON.stringify(params || {})], (err, out) => {
