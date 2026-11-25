@@ -27,7 +27,7 @@ function isRuntimeSource(rel) {
   if (rel === 'config.xml' || rel === 'grid.css' || rel === 'optics.js' || rel === '.DS_Store' || rel.endsWith('/.DS_Store')) return false;
   if (rel.startsWith('assets/grid/') || rel.startsWith('assets/vendor/') || rel.startsWith('assets/aerials/') || rel.startsWith('assets/materials/') || rel.startsWith('assets/fonts/')) return false;
   if (rel === 'assets/typefaces.css' || rel === 'assets/private-fonts.css') return false;
-  if (/^assets\/wallpapers\/[^/]+-glass-\d+\.png$/.test(rel)) return false;
+  if (/^assets\/wallpapers\/.+\.(jpg|png)$/.test(rel)) return false;
   return true;
 }
 

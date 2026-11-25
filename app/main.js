@@ -2544,7 +2544,7 @@
       if (document.hidden) { finish(loadedBundle); return; }
       window.requestAnimationFrame(function () { if (!failed && token === wallToken) finish(loadedBundle); });
     }
-    needs = target.bg === 'photo' && S.bundleKey !== bundleKey(target) && (!S.shown || S.shown.bg !== 'photo' || target.wall !== S.c.wall || materialApplies(target));
+    needs = target.layout !== 'cards' && target.bg === 'photo' && S.bundleKey !== bundleKey(target) && (!S.shown || S.shown.bg !== 'photo' || target.wall !== S.c.wall || materialApplies(target));
     needsFont = !fontMetrics[target.font]; imageDone = !needs; fontDone = !needsFont;
     if (!needs && !needsFont) { finish(null); return; }
     S.pending = { patch: changes, target: target, row: opts.row || (needsFont ? 'font' : S.appearanceFocus), transient: !!opts.transient, preview: false };
