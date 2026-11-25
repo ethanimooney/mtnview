@@ -78,6 +78,9 @@
     inputs: [],
     inputsLoading: false,
     inputsError: null,
+    apps: [],
+    appsLoading: false,
+    appsError: null,
     leaveIdx: 0
   };
 
@@ -617,10 +620,22 @@
       renderOverlay();
     });
   }
+  function loadAppsDetail() {
+    S.appsLoading = true; S.appsError = null;
+    renderOverlay();
+    FrameDevice.apps(function (err, list) {
+      if (S.view !== 'detail' || S.detailGroup !== 'apps') return;
+      S.appsLoading = false;
+      S.apps = list || [];
+      S.appsError = err ? err.message : null;
+      renderOverlay();
+    });
+  }
   function openSettings() { S.view = 'settings'; render(); }
   function openDetail(group) {
     S.view = 'detail'; S.detailGroup = group; S.detailRow = 1; S.detailCol = 0;
     if (group === 'inputs') { S.inputs = []; loadInputsDetail(); }
+    if (group === 'apps') { S.apps = []; loadAppsDetail(); }
     render();
   }
   function closeOverlay() {
@@ -691,11 +706,18 @@
         ]
       };
     }
+    if (group === 'apps') {
+      var appItems = S.apps.length ? S.apps.map(function (a) {
+        return { action: 'app.' + a.appId, appId: a.appId, label: a.name };
+      }) : [{ action: 'apps.retry', label: S.appsLoading ? 'Loading installed apps…' : (S.appsError || 'No apps found'), disabled: S.appsLoading }];
+      return { title: 'Installed Apps', sections: [{ title: '', items: appItems }] };
+    }
     return {
       title: 'LG TV',
       sections: [{
         title: '',
         items: [
+          { action: 'lgtv.apps', label: 'Installed webOS Apps', desc: 'Launch Homebrew, Plex, Jellyfin, YouTube & other TV apps' },
           { action: 'lgtv.inputs', label: 'Switch HDMI Input', desc: 'Pick any HDMI 1–4 input directly (including eARC / soundbar ports)' },
           { action: 'lgtv.settings', label: 'LG TV Settings', desc: 'Picture, sound and network settings' },
           { action: 'lgtv.home', label: 'LG webOS Home', desc: 'Open LG’s stock Home screen' }
@@ -739,8 +761,14 @@
       S.c.controls = item.action.slice(5); savePrefs(); renderHome(); renderOverlay();
     } else if (item.action === 'inputs.retry') {
       loadInputsDetail();
+    } else if (item.action === 'apps.retry') {
+      loadAppsDetail();
+    } else if (item.action.indexOf('app.') === 0) {
+      FrameDevice.launchApp(item.appId, function () {});
     } else if (item.action.indexOf('input.') === 0) {
       FrameDevice.setSource(item.port, function () {});
+    } else if (item.action === 'lgtv.apps') {
+      openDetail('apps');
     } else if (item.action === 'lgtv.inputs') {
       openDetail('inputs');
     } else if (item.action === 'lgtv.settings') {
@@ -884,8 +912,12 @@
     var hint = focusedItem.action === 'back' ? 'Return to Settings' : typeof focusedItem.aerialIdx === 'number' ? 'Play this Aerial' : focusedItem.radio ? 'Apply selected setting' : focusedItem.action.indexOf('toggle.') === 0 ? 'Change setting' : 'Open on the TV';
     setHTML(overlayEl, '<div class="detail-back"><button type="button" tabindex="-1" class="choice back-btn' + (S.detailRow === 0 ? ' is-focus' : '') + '" data-z="detail" data-r="0" data-c="0">' + icon('left') + '<span>Settings</span></button></div>'
       + '<h2 class="detail-title">' + esc(model.title) + '</h2>'
-      + '<div class="detail-rows">' + secHtml + '</div>'
+      + '<div class="detail-rows" id="detailRows">' + secHtml + '</div>'
       + '<p class="ov-hint"><span class="remote-key">OK</span><span>' + esc(hint) + '</span></p>');
+    var focEl = overlayEl.querySelector('.detail-rows .is-focus');
+    if (focEl && typeof focEl.scrollIntoView === 'function') {
+      try { focEl.scrollIntoView({ block: 'nearest' }); } catch (e) { /* ignore */ }
+    }
   }
 
   function render() {
@@ -966,6 +998,30 @@
     handleKey(k);
   });
   document.addEventListener('keyup', function (ev) { delete heldKeys[ev.keyCode]; });
+
+  /* Magic Remote pointer hover smoothly focuses cards & Settings rows. */
+  stage.addEventListener('mouseover', function (ev) {
+    if (ambientActive || oledBlack) return;
+    var el = ev.target;
+    while (el && el !== stage && !(el.getAttribute && el.getAttribute('data-z'))) el = el.parentNode;
+    if (!el || el === stage) return;
+    var z = el.getAttribute('data-z');
+    if (z === 'util' && S.view === 'home' && !S.switching && S.zone !== 'util') {
+      S.zone = 'util'; renderHome();
+    } else if (z === 'card' && S.view === 'home' && !S.switching) {
+      var ci = Number(el.getAttribute('data-i'));
+      if (isFinite(ci) && (S.zone !== 'cards' || S.cardIdx !== ci)) { S.zone = 'cards'; S.cardIdx = ci; renderHome(); }
+    } else if (z === 'set-group' && S.view === 'settings') {
+      var si = Number(el.getAttribute('data-i'));
+      if (isFinite(si) && S.settingsIdx !== si) { S.settingsIdx = si; renderOverlay(); }
+    } else if (z === 'detail' && S.view === 'detail') {
+      var dr = Number(el.getAttribute('data-r')), dc = Number(el.getAttribute('data-c'));
+      if (isFinite(dr) && isFinite(dc) && (S.detailRow !== dr || S.detailCol !== dc)) { S.detailRow = dr; S.detailCol = dc; renderOverlay(); }
+    } else if (z === 'leave' && S.view === 'leave') {
+      var li = Number(el.getAttribute('data-i'));
+      if (isFinite(li) && S.leaveIdx !== li) { S.leaveIdx = li; renderOverlay(); }
+    }
+  });
 
   stage.addEventListener('click', function (ev) {
     if (touchActivity()) return;

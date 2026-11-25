@@ -152,3 +152,26 @@ test('turnOffScreen calls tvpower power/turnOffScreen with standbyMode active', 
     done();
   });
 });
+
+test('apps lists installed webOS apps and excludes internal/HDMI/self', (_, done) => {
+  class MockBridge {
+    call() {
+      setTimeout(() => this.onservicecallback(JSON.stringify({
+        returnValue: true,
+        launchPoints: [
+          { id: 'com.mtnview.launcher', title: 'mtnview' },
+          { id: 'com.webos.app.hdmi1', title: 'HDMI 1' },
+          { id: 'com.webos.app.home', title: 'Home' },
+          { id: 'youtube.leanback.v4', title: 'YouTube' },
+          { id: 'org.webosbrew.hbchannel', title: 'Homebrew Channel' }
+        ]
+      })), 0);
+    }
+  }
+  const dev = loadDevice({ PalmServiceBridge: MockBridge });
+  dev.apps((err, list) => {
+    assert.equal(err, null);
+    assert.deepEqual(Array.from(list, (a) => a.appId), ['org.webosbrew.hbchannel', 'youtube.leanback.v4']);
+    done();
+  });
+});

@@ -5,24 +5,30 @@
 <h1 align="center">mtnview</h1>
 
 <p align="center">
-  A minimalist, ad-free home launcher (<code>com.mtnview.launcher</code>) for rooted <strong>LG webOS</strong> TVs.<br/>
+  A minimalist, ad-free home launcher (<code>com.mtnview.launcher</code>) for <strong>LG webOS</strong> TVs.<br/>
   <em>Originally forked from <a href="https://github.com/nthnclrk/CleanFrame">CleanFrame</a> and rebuilt for LG webOS OLED TVs.</em>
 </p>
 
 <p align="center">
   <a href="https://github.com/ethanimooney/mtnview/actions/workflows/check.yml"><img src="https://github.com/ethanimooney/mtnview/actions/workflows/check.yml/badge.svg" alt="Check" /></a>
+  <a href="https://github.com/ethanimooney/mtnview/releases/latest"><img src="https://img.shields.io/github/v/release/ethanimooney/mtnview" alt="Latest Release" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License" /></a>
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/home.png" width="49%" alt="mtnview Home Screen" />
+  <img src="docs/screenshots/settings.png" width="49%" alt="mtnview Settings" />
 </p>
 
 ---
 
 ## Features
-- **Live Dynamic HDMI Cards:** Reads plugged-in HDMI inputs, CEC names, and live power state directly from `luna://com.webos.service.eim/getAllInputStatus`, automatically hides eARC soundbars, matches device icons (Apple TV, PlayStation, Nintendo Switch, Xbox, streaming boxes, generic HDMI), and caches sleeping device names per port.
+- **Live Dynamic HDMI Cards:** Reads plugged-in HDMI inputs, CEC names, and live power state directly from `luna://com.webos.service.eim/getAllInputStatus`, automatically hides eARC soundbars/AVRs, matches device icons (Apple TV, PlayStation, Nintendo Switch, Xbox, PC/Mac, Blu-ray, Roku/Fire TV/Shield, generic HDMI), and caches sleeping device names per port.
 - **Full-Length Mountain Aerials:** 6 uncut (4–7 min) Yosemite & Scottish Highlands Apple Aerials stored persistently on the TV (`/media/developer/mtnview-aerials`) with seamless dual-`<video>` crossfades, single active hardware decoder, and bottom-right location captions.
 - **OLED Ambient Mode & Protection:** Activates after 2.5 min idle (or pressing **Down**), drifts an Inter clock/date/weather overlay, automatically turns off the OLED screen after 30/60 min (`turnOffScreen`), and auto-dims from 9 PM–6 AM.
-- **Frosted-Glass Settings:** Matching dark translucent cards for **HDMI Inputs**, **Mountain Aerials** scene picker, **Ambient & Audio**, and **LG TV**.
+- **Global-Ready & Magic Remote Friendly:** Supports **12h/24h** clock, **°F/°C** weather (auto-detected from locale), Magic Remote pointer hover focus, and a hidden **Installed webOS Apps** launcher under **Settings → LG TV** (for Homebrew YouTube, Plex, Jellyfin, Stremio, etc.) without cluttering Home.
 - **Optional Rooted TV Daemons (`tv-backup/`):**
-  - `mtnview-home.js` + `init.d/99-mtnview-home`: Dynamic remote hotkeys (auto-resolved to your HDMI ports), global Screen Off shortcut, and auto-return to `mtnview` when non-Apple-TV HDMI consoles power off (6s grace period).
+  - `mtnview-home.js` + `init.d/99-mtnview-home`: Auto-discovered Magic Remote evdev hotkeys (dynamically mapped to your HDMI ports), global Screen Off shortcut, and auto-return to `mtnview` when non-Apple-TV HDMI consoles power off (6s grace period).
   - `init.d/99-mtnview`: Auto-launches `mtnview` on boot & Quick Start+ wake (automatically skipping when Apple TV or another active HDMI device wakes the TV via CEC).
   - `init.d/10-adblock-hosts`: Blocks LG ads, telemetry, and firmware update servers via bind-mounted `/etc/hosts`.
 
@@ -30,12 +36,19 @@
 
 ## Installation
 
-### Prerequisites
+### Option A: Quick Install (Non-Rooted or Rooted — Pre-Built `.ipk`)
+The core `mtnview` app (~109 KB) works on **any LG webOS TV**, rooted or non-rooted:
+1. Download `com.mtnview.launcher_1.0.1_all.ipk` from the [**Latest GitHub Release**](https://github.com/ethanimooney/mtnview/releases/latest).
+2. Install it using [**webOS Dev Manager**](https://github.com/webosbrew/dev-manager-desktop) (Dev Mode) or **Homebrew Channel**.
+
+### Option B: Full Rooted Setup (Aerials + Zero-Flash Home + Daemons)
+
+#### Prerequisites
 - A rooted LG webOS TV (tested on **LG OLED C6 / webOS 11.2.0**) with **Homebrew Channel** (`org.webosbrew.hbchannel`) and **SSH** enabled (port `22`, `root`).
 - **Home Chooser** (`org.webosbrew.homechooser`) installed from Homebrew Channel (for zero-flash native Home button replacement).
 - **Node.js 20+** and passwordless SSH access to your TV (`ssh-copy-id root@<TV_IP>`).
 
-### 1. Clone & configure TV IP
+#### 1. Clone & configure TV IP
 ```sh
 git clone https://github.com/ethanimooney/mtnview.git
 cd mtnview
@@ -47,36 +60,36 @@ EOF
 ```
 *(You can also pass `<TV_IP>` directly as the first argument to any script instead of creating `.local/tv.env`.)*
 
-### 2. Download & convert the 6 mountain Aerials (macOS, Linux, or WSL)
+#### 2. Download & convert the 6 mountain Aerials (macOS, Linux, or WSL)
 ```sh
 ./scripts/download-aerials.sh
 ```
 Downloads the 6 full-length Yosemite & Scottish Highlands Apple Aerials and converts them into fast-start 720p MP4s in `app/assets/aerials/` (uses `avconvert` on macOS or `ffmpeg` on Linux/WSL).
 
-### 3. Build & install `mtnview` on the TV
+#### 3. Build & install `mtnview` on the TV
 ```sh
 ./scripts/deploy-lg.sh
 ```
 Runs unit tests, builds the ~109 KB `.ipk` package in `dist/`, installs it via `appInstallService`, links persistent Aerials, and launches `mtnview`.
 
-### 4. Sync the Aerial videos to persistent TV storage
+#### 4. Sync the Aerial videos to persistent TV storage
 ```sh
 ./scripts/sync-aerials-lg.sh
 ```
 Uploads the 6 MP4s to `/media/developer/mtnview-aerials` on the TV (bypassing `/tmp`) and symlinks them into the installed app so future app updates stay ~109 KB and install in ~1 second.
 
-### 5. Install TV daemons, ad-blocker & elevate Home Chooser (optional)
+#### 5. Install TV daemons, ad-blocker & elevate Home Chooser (optional)
 ```sh
 ./scripts/restore-tv.sh
 ```
 Copies `mtnview-home.js` and `init.d/*` scripts to `/var/lib/webosbrew/`, applies `/etc/hosts` ad & update blocking, elevates `org.webosbrew.homechooser.service`, and starts the remote & wake daemons.
 
-### 6. Set `mtnview` as your default Home screen
+#### 6. Set `mtnview` as your default Home screen
 1. Open **Home Chooser** on your LG TV.
 2. Select **mtnview**.
 3. Press the **Home** button on your Magic Remote — `mtnview` now opens natively with zero LG Home flash.
 
-### Updating later
+#### Updating later
 ```sh
 ./scripts/deploy-lg.sh
 ```

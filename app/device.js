@@ -283,11 +283,40 @@
     }, CONFIG.powerTimeoutMs);
   }
 
+  var INTERNAL_APPS = [
+    'com.webos.app.home', 'com.webos.app.livetv', 'com.palm.app.settings',
+    'com.webos.app.setting', 'com.webos.app.connectionwizard', 'com.webos.app.notificationcenter',
+    'com.webos.app.voice', 'com.webos.app.screensaver', 'com.webos.app.factorywin',
+    'com.webos.app.softwareupdate', 'com.webos.app.self-diagnosis', 'com.webos.app.quicksettings',
+    'com.webos.app.inputcommon'
+  ];
+
+  function apps(done) {
+    if (!hasLuna()) { unavailable(done); return; }
+    luna('luna://com.webos.applicationManager', 'listLaunchPoints', {}, function (err, res) {
+      if (err) { done(err); return; }
+      var list = (res && Array.isArray(res.launchPoints)) ? res.launchPoints : [];
+      var seen = {}, result = [], self = selfId();
+      list.forEach(function (a) {
+        if (!a || !a.id) return;
+        var id = a.id, name = a.title || a.name || '';
+        if (!name || id === self || seen[id] || INTERNAL_APPS.indexOf(id) >= 0) return;
+        if (a.visible === false || /^com\.webos\.app\.hdmi\d+$/i.test(id)) return;
+        if (/(?:service|worker|preview|plugin|sdk|factory|daemon|overlay)/i.test(name + ' ' + id)) return;
+        seen[id] = true;
+        result.push({ appId: id, name: name });
+      });
+      result.sort(function (a, b) { return a.name.toLowerCase().localeCompare(b.name.toLowerCase()); });
+      done(null, result);
+    }, 15000);
+  }
+
   window.FrameDevice = {
     platform: 'webos',
     launchApp: launchApp,
     home: home,
     settings: settings,
+    apps: apps,
     sources: sources,
     setSource: setSource,
     cancelSource: cancelSource,
