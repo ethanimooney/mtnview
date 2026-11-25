@@ -25,12 +25,18 @@ scp -O "$IPK" "root@$TV_IP:/tmp/mtnview.ipk"
 
 echo "4/4 Installing, re-linking persistent Aerials, and launching mtnview v$VERSION..."
 ssh "root@$TV_IP" '
-luna-send-pub -i "luna://com.webos.appInstallService/dev/install" "{\"id\":\"com.mtnview.launcher\",\"ipkUrl\":\"/tmp/mtnview.ipk\",\"subscribe\":true}" | while IFS= read -r line; do
-  echo "$line"
-  case "$line" in
-    *"\"installed\""*|*"\"install failed\""*|*"\"errorCode\""*) break ;;
-  esac
-done
+node -e "
+const { spawn } = require(\"child_process\");
+const p = spawn(\"luna-send-pub\", [\"-i\", \"luna://com.webos.appInstallService/dev/install\", JSON.stringify({ id: \"com.mtnview.launcher\", ipkUrl: \"/tmp/mtnview.ipk\", subscribe: true })]);
+p.stdout.on(\"data\", (d) => {
+  const s = d.toString();
+  process.stdout.write(s);
+  if (s.includes(\"\\\"installed\\\"\") || s.includes(\"\\\"install failed\\\"\") || s.includes(\"\\\"errorCode\\\"\")) {
+    p.kill();
+    process.exit(s.includes(\"\\\"installed\\\"\") ? 0 : 1);
+  }
+});
+"
 if [ -d /media/developer/mtnview-aerials ] && [ -d /media/developer/apps/usr/palm/applications/com.mtnview.launcher/assets ]; then
   rm -rf /media/developer/apps/usr/palm/applications/com.mtnview.launcher/assets/aerials
   ln -s /media/developer/mtnview-aerials /media/developer/apps/usr/palm/applications/com.mtnview.launcher/assets/aerials
