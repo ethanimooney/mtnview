@@ -154,3 +154,21 @@ test('inhibitScreenSaver registers and replies ack:false on Active', () => {
   assert.equal(calls[1].payload.timestamp, '987654');
   dev.allowScreenSaver();
 });
+
+test('turnOffScreen calls tvpower power/turnOffScreen with standbyMode active', (_, done) => {
+  const calls = [];
+  class MockBridge {
+    call(uri, payload) {
+      calls.push({ uri, payload: JSON.parse(payload) });
+      setTimeout(() => this.onservicecallback(JSON.stringify({ returnValue: true })), 0);
+    }
+  }
+  const dev = loadDevice({ PalmServiceBridge: MockBridge });
+  dev.turnOffScreen((err) => {
+    assert.equal(err, null);
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].uri, 'luna://com.webos.service.tvpower/power/turnOffScreen');
+    assert.equal(calls[0].payload.standbyMode, 'active');
+    done();
+  });
+});

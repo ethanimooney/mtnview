@@ -278,6 +278,17 @@
     screenSaverBridge = null;
   }
 
+  function turnOffScreen(done) {
+    var cb = typeof done === 'function' ? done : function () {};
+    if (!hasLuna()) { unavailable(cb); return; }
+    luna('luna://com.webos.service.tvpower', 'power/turnOffScreen', { standbyMode: 'active' }, function (err) {
+      if (!err) { cb(null); return; }
+      luna('luna://com.webos.service.tvpower', 'power/turnOffScreen', {}, function (err2) {
+        cb(err2 ? failure(err2, 'Could not turn off the screen.') : null);
+      });
+    }, 5000);
+  }
+
   window.FrameDevice = {
     platform: 'webos',
     launch: launch,
@@ -289,6 +300,7 @@
     setSource: setSource,
     cancelSource: cancelSource,
     inhibitScreenSaver: inhibitScreenSaver,
-    allowScreenSaver: allowScreenSaver
+    allowScreenSaver: allowScreenSaver,
+    turnOffScreen: turnOffScreen
   };
 }());

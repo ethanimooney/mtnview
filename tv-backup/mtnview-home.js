@@ -7,7 +7,8 @@ const HOTKEYS = {
   1038: { target: "com.webos.app.hdmi3", cancel: "amazon" },
   1042: { target: "com.webos.app.hdmi4", cancel: "com.disney.disneyplus-prod" }
 };
-const BLOCK_KEYS = { 1043: true, 1133: true, 1137: true };
+const SCREEN_OFF_KEY = 1043; // LG Channels button -> OLED Screen Off (works globally, great for Sonos audio)
+const BLOCK_KEYS = { 1133: true, 1137: true };
 const sz = process.arch === "arm64" ? 24 : 16;
 let lastPress = 0;
 
@@ -65,6 +66,26 @@ function watchDevice(dev) {
             });
           }, ms);
         }
+      } else if (code === SCREEN_OFF_KEY) {
+        const now = Date.now();
+        if (now - lastPress < 800) continue;
+        lastPress = now;
+        log("screen-off shortcut pressed");
+        luna("luna://com.webos.service.tvpower/power/turnOffScreen", { standbyMode: "active" });
+        // Cancel LG Channels if webOS tries to launch it in the background
+        getForegroundApp((stayOn) => {
+          for (const ms of [400, 1200]) {
+            setTimeout(() => {
+              getForegroundApp((cur) => {
+                if (cur && stayOn && cur !== stayOn && /livetv|channel/i.test(cur)) {
+                  luna("luna://com.webos.applicationManager/closeByAppId", { id: cur }, () => {
+                    launchTarget(stayOn);
+                  });
+                }
+              });
+            }, ms);
+          }
+        });
       } else if (BLOCK_KEYS[code]) {
         const now = Date.now();
         if (now - lastPress < 500) continue;

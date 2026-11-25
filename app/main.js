@@ -10,7 +10,7 @@
   var ED_ROW = 80, ED_SEP = 56, ED_VIEW = 752;
   var PH_TOP = 220, PH_PITCH = 128, PH_FULL = 5, PH_HEIGHT = 944, PH_COMPACT_TOP = 144, PH_COMPACT_PITCH = 88, PH_COMPACT_VISIBLE = 9;
   var WALL_VISIBLE = 6, WALL_ROW = 92, WALL_DELAY = 200;
-  var KEYS = { 37: 'left', 38: 'up', 39: 'right', 40: 'down', 13: 'ok', 27: 'back', 8: 'back', 10009: 'back', 461: 'back' };
+  var KEYS = { 37: 'left', 38: 'up', 39: 'right', 40: 'down', 13: 'ok', 27: 'back', 8: 'back', 10009: 'back', 461: 'back', 403: 'red', 404: 'green', 405: 'yellow', 406: 'blue' };
   var FULL = 'Home holds nine apps. Remove one first.', LAST = 'Home needs one app';
 
   var PRIMARY_APPS = [
@@ -55,7 +55,8 @@
     { id: 'game', name: 'Game' },
     { id: 'night', name: 'Night' }
   ];
-  var AMBIENT_WALLS = ['forest', 'valley', 'misty', 'mint', 'cove', 'ridge'];
+  var AMBIENT_WALLS = ['forest', 'misty', 'alpine', 'peaks'];
+  var AMBIENT_SLEEP_NAMES = { '30': 'After 30 min', '60': 'After 60 min', off: 'Off' };
   var AERIAL_HOME = [
     { src: 'assets/aerials/yosemite-valley.mp4', title: 'Yosemite Valley', sub: 'California' },
     { src: 'assets/aerials/hawaii-coast.mp4', title: 'Kohala Valley', sub: 'Hawaii' },
@@ -386,6 +387,8 @@
       sounds: s.sounds === false ? false : true,
       todWall: s.todWall === false ? false : true,
       ambient: s.ambient === false ? false : true,
+      ambientSleep: pick(s.ambientSleep, ['30', '60', 'off'], '30'),
+      autoNight: s.autoNight === false ? false : true,
       bgMotion: pick(s.bgMotion, ['aerial', 'kenburns', 'static'], 'aerial'),
       pictureMode: pick(s.pictureMode, ['cinema', 'filmmaker', 'game', 'night'], 'cinema'),
       ports: (s.ports && s.ports.ps5 !== undefined) ? {
@@ -428,6 +431,8 @@
     c.sounds = S.c.sounds !== false;
     c.todWall = S.c.todWall !== false;
     c.ambient = S.c.ambient !== false;
+    c.ambientSleep = S.c.ambientSleep || '30';
+    c.autoNight = S.c.autoNight !== false;
     c.bgMotion = S.c.bgMotion || 'aerial';
     c.pictureMode = S.c.pictureMode || 'cinema';
     c.ports = { appletv: S.c.ports.appletv, ps5: S.c.ports.ps5, switch: S.c.ports.switch };
@@ -1061,8 +1066,10 @@
       { id: 'wall', title: 'Fallback wallpaper', items: [{ action: 'background.wallpaper', label: wall(S.c.wall).name, thumbnail: true }] }
     ];
     if (t.group === 'preferences') return [
-      { id: 'prefs', title: 'Screensaver & Audio', items: [
+      { id: 'prefs', title: 'OLED Protection & Audio', items: [
         { action: 'samsung.ambient', label: 'OLED ambient mode: ' + (S.c.ambient !== false ? 'On' : 'Off'), description: 'Dim screen with drifting clock & Aerials after 2.5 min idle' },
+        { action: 'samsung.ambientSleep', label: 'Ambient screen-off: ' + (AMBIENT_SLEEP_NAMES[S.c.ambientSleep] || 'After 30 min'), description: 'Blank OLED panel after extended Ambient Mode (Red button works anytime)' },
+        { action: 'samsung.autoNight', label: 'Auto night dim: ' + (S.c.autoNight !== false ? 'On' : 'Off'), description: 'Deepen scrim & soften contrast 9 PM–6 AM (Green button toggles)' },
         { action: 'samsung.sounds', label: 'Navigation sounds: ' + (S.c.sounds !== false ? 'On' : 'Off'), description: 'Subtle tactile clicks when scrolling and selecting' }
       ] },
       { id: 'controls', title: 'Top bar style', horizontal: true, items: options('controls', ['icons', 'both', 'text']) }
@@ -1151,6 +1158,18 @@
       c = next(S.c.home.slice(), S.c.recent.slice());
       c.ambient = !(S.c.ambient !== false);
       write(c, 'OLED ambient mode');
+    }
+    else if (item.action === 'samsung.ambientSleep') {
+      var sleepOrder = ['30', '60', 'off'];
+      c = next(S.c.home.slice(), S.c.recent.slice());
+      c.ambientSleep = sleepOrder[(sleepOrder.indexOf(S.c.ambientSleep || '30') + 1) % sleepOrder.length];
+      write(c, 'Ambient screen-off');
+    }
+    else if (item.action === 'samsung.autoNight') {
+      c = next(S.c.home.slice(), S.c.recent.slice());
+      c.autoNight = !(S.c.autoNight !== false);
+      nightOverride = null;
+      write(c, 'Auto night dim');
     }
     else if (item.action === 'samsung.home') perform('LG Home', FrameDevice.home);
     else if (item.action === 'samsung.settings') perform('TV settings', FrameDevice.settings);
@@ -1345,19 +1364,40 @@
   }
   /* ---------- Time-of-day wallpapers, live HDMI dots, weather, OLED ambient ---------- */
   var hdmiStatus = {}, hdmiPollTimer = 0, weatherData = null, weatherTimer = 0;
-  var lastActivity = Date.now(), ambientActive = false, ambientWallIdx = 0, ambientPos = { x: 160, y: 660 }, ambientTickTimer = 0, ambientShiftAt = 0;
+  var lastActivity = Date.now(), ambientActive = false, oledBlack = false, ambientEnteredAt = 0, nightOverride = null, toastTimer = 0;
+  var ambientWallIdx = 0, ambientPos = { x: 160, y: 660 }, ambientTickTimer = 0, ambientShiftAt = 0;
   var AMBIENT_SPOTS = [
     { x: 140, y: 660 }, { x: 1080, y: 660 }, { x: 140, y: 160 },
     { x: 1080, y: 160 }, { x: 600, y: 420 }, { x: 320, y: 580 }
   ];
   var ambientSpotIdx = 0;
 
+  function isNightDim() {
+    if (nightOverride !== null) return nightOverride;
+    if (S.c.pictureMode === 'night') return true;
+    if (S.c.autoNight !== false) {
+      var hr = new Date().getHours();
+      return hr >= 21 || hr < 6;
+    }
+    return false;
+  }
+  function showSnazzyToast(msg) {
+    var el = $('snazzyToast');
+    if (!el) return;
+    clearTimeout(toastTimer);
+    el.textContent = msg;
+    el.className = 'snazzy-toast is-on';
+    toastTimer = setTimeout(function () {
+      var tEl = $('snazzyToast');
+      if (tEl) tEl.className = 'snazzy-toast';
+    }, 2400);
+  }
   function timeOfDayWalls() {
     var hr = new Date().getHours();
-    if (hr >= 5 && hr < 11) return ['misty', 'mint', 'valley', 'forest'];
-    if (hr >= 11 && hr < 17) return ['forest', 'valley', 'cove', 'misty'];
-    if (hr >= 17 && hr < 20) return ['forest', 'ridge', 'valley', 'bridge'];
-    return ['forest', 'misty', 'peaks', 'night'];
+    if (hr >= 5 && hr < 11) return ['misty', 'alpine', 'forest', 'peaks'];
+    if (hr >= 11 && hr < 17) return ['forest', 'misty', 'alpine', 'peaks'];
+    if (hr >= 17 && hr < 20) return ['alpine', 'forest', 'peaks', 'misty'];
+    return ['peaks', 'forest', 'misty', 'alpine'];
   }
   function snazzyWallForCard(c, idx, t) {
     if (ambientActive) return AMBIENT_WALLS[ambientWallIdx % AMBIENT_WALLS.length];
@@ -1471,17 +1511,29 @@
   }
   function touchActivity() {
     lastActivity = Date.now();
-    if (ambientActive) {
+    if (oledBlack || ambientActive) {
+      oledBlack = false;
       ambientActive = false;
       render();
       return true;
     }
     return false;
   }
+  function enterOledSleep() {
+    if (oledBlack) return;
+    oledBlack = true;
+    ambientActive = true;
+    render();
+    if (FrameDevice && typeof FrameDevice.turnOffScreen === 'function') {
+      FrameDevice.turnOffScreen(function () {});
+    }
+  }
   function enterAmbient() {
     if (ambientActive || S.c.layout !== 'cards' || top().id !== 'home' || S.switching) return;
     ambientActive = true;
-    ambientShiftAt = Date.now();
+    oledBlack = false;
+    ambientEnteredAt = Date.now();
+    ambientShiftAt = ambientEnteredAt;
     ambientSpotIdx = (ambientSpotIdx + 1) % AMBIENT_SPOTS.length;
     ambientPos = AMBIENT_SPOTS[ambientSpotIdx];
     render();
@@ -1490,18 +1542,25 @@
     clearInterval(ambientTickTimer);
     ambientTickTimer = setInterval(function () {
       if (document.hidden || S.c.layout !== 'cards' || S.c.ambient === false || top().id !== 'home' || S.switching) {
-        if (ambientActive) { ambientActive = false; render(); }
+        if (ambientActive || oledBlack) { ambientActive = false; oledBlack = false; render(); }
         return;
       }
       var now = Date.now();
       if (!ambientActive && now - lastActivity >= AMBIENT_IDLE_MS) {
         enterAmbient();
-      } else if (ambientActive && now - ambientShiftAt >= 45000) {
-        ambientShiftAt = now;
-        ambientWallIdx = (ambientWallIdx + 1) % AMBIENT_WALLS.length;
-        ambientSpotIdx = (ambientSpotIdx + 1) % AMBIENT_SPOTS.length;
-        ambientPos = AMBIENT_SPOTS[ambientSpotIdx];
-        renderSnazzyCards(homeState(top()));
+      } else if (ambientActive && !oledBlack) {
+        var sleepMins = S.c.ambientSleep === 'off' ? 0 : (parseInt(S.c.ambientSleep, 10) || 30);
+        if (sleepMins > 0 && ambientEnteredAt && now - ambientEnteredAt >= sleepMins * 60000) {
+          enterOledSleep();
+          return;
+        }
+        if (now - ambientShiftAt >= 45000) {
+          ambientShiftAt = now;
+          ambientWallIdx = (ambientWallIdx + 1) % AMBIENT_WALLS.length;
+          ambientSpotIdx = (ambientSpotIdx + 1) % AMBIENT_SPOTS.length;
+          ambientPos = AMBIENT_SPOTS[ambientSpotIdx];
+          renderSnazzyCards(homeState(top()));
+        }
       }
     }, 10000);
   }
@@ -1555,7 +1614,7 @@
   }
   function syncAerialVideo() {
     var v0 = aerialVid(0), v1 = aerialVid(1);
-    var useAerial = !document.hidden && S.c.layout === 'cards' && (S.c.bgMotion || 'aerial') === 'aerial';
+    var useAerial = !document.hidden && !oledBlack && S.c.layout === 'cards' && (S.c.bgMotion || 'aerial') === 'aerial';
     if (!v0 || !v1) return;
     if (!useAerial) {
       aerialCurrentSrc = ''; aerialPreloadSrc = ''; aerialTransitioning = false;
@@ -1634,7 +1693,9 @@
       + '<div class="snazzy-clock" id="snazzyClock"></div>'
       + '<div class="snazzy-stage-body" id="snazzyStageBody"></div>'
       + '<div class="snazzy-ambient" id="snazzyAmbient" aria-hidden="true"></div>'
-      + '<div class="snazzy-loc" id="snazzyLoc" aria-hidden="true"></div>';
+      + '<div class="snazzy-loc" id="snazzyLoc" aria-hidden="true"></div>'
+      + '<div class="snazzy-toast" id="snazzyToast" aria-live="polite"></div>'
+      + '<div class="snazzy-oled-black" aria-hidden="true"></div>';
     [aerialVid(0), aerialVid(1)].forEach(function (vid) {
       vid.muted = true;
       vid.defaultMuted = true;
@@ -1652,7 +1713,7 @@
     if (wallList.indexOf(activeWall) < 0) wallList.push(activeWall);
     var photosEl = $('snazzyPhotos'), clockEl = $('snazzyClock'), bodyEl = $('snazzyStageBody'), ambEl = $('snazzyAmbient');
     var motionMode = S.c.bgMotion || 'aerial';
-    snazzyHome.className = 'snazzy-home' + (ambientActive ? ' is-ambient' : '') + (S.c.pictureMode === 'night' ? ' is-night-dim' : '') + (motionMode !== 'static' ? ' is-kenburns' : '');
+    snazzyHome.className = 'snazzy-home' + (ambientActive ? ' is-ambient' : '') + (oledBlack ? ' is-oled-black' : '') + (isNightDim() ? ' is-night-dim' : '') + (motionMode !== 'static' ? ' is-kenburns' : '');
     syncAerialVideo();
     keyed(photosEl, wallList.map(function (w) { return { key: w, id: w }; }), function (img, it) {
       var src = WP + it.id + '.jpg';
@@ -1686,6 +1747,9 @@
         + '</div>');
     } else {
       var subPort = active.kind === 'hdmi' ? (S.c.ports[active.id] === 0 ? 'App' : 'HDMI ' + S.c.ports[active.id]) : '';
+      var activePortNum = active.kind === 'hdmi' ? S.c.ports[active.id] : 0;
+      var activePortSt = activePortNum ? hdmiStatus[activePortNum] : null;
+      var activePowered = !!(activePortSt && (activePortSt.active || activePortSt.connected));
       if (!bodyEl.querySelector('.snazzy-row')) {
         setHTML(bodyEl, '<div class="snazzy-hero">'
           + '<h1 class="snazzy-title" id="snazzyTitle"></h1>'
@@ -1694,7 +1758,7 @@
           + '<div class="snazzy-row" id="snazzyRow" role="list"></div>');
       }
       setHTML($('snazzyTitle'), esc(active.name));
-      setHTML($('snazzyPrompt'), '<span>Press</span><span class="snazzy-ok-badge">OK</span><span>to ' + esc(active.verb) + (subPort ? ' · ' + esc(subPort) : '') + '</span>');
+      setHTML($('snazzyPrompt'), '<span>Press</span><span class="snazzy-ok-badge">OK</span><span>to ' + esc(active.verb) + (subPort ? ' · ' + esc(subPort) : '') + (activePowered ? ' · </span><span class="snazzy-power-tag">Powered on</span>' : '</span>'));
       keyed($('snazzyRow'), SNAZZY_CARDS.map(function (c) { return { key: c.id, card: c }; }), function (btn, it, i) {
         var c = it.card, isSel = i === idx && cardFocus, isDim = i === idx && !cardFocus;
         var portNum = c.kind === 'hdmi' ? S.c.ports[c.id] : 0;
@@ -2311,12 +2375,15 @@
   function swapImg(k, im) { var old = IMG[k]; if (old === im) return; im.style.cssText = old.style.cssText; if (old.id) im.id = old.id; old.parentNode.replaceChild(im, old); IMG[k] = im; }
   function bundleKey(look) { return look.wall + '|' + look.material; }
   function loadBundle(look, token, done) {
-    var imgs = { photo: makeImg('photo', WP + look.wall + '.jpg'), bg: makeImg('sheet-bg', WP + look.wall + '-panel.jpg') }, keys, left, allOk = true;
-    imgs.mat = makeImg('mat-img', matSrc(look.wall, look.material));
-    imgs.field = makeImg('ph-field-img', fieldSrc(look.wall, look.material));
-    imgs.fieldAlt = makeImg('ph-field-img', fieldSrc(look.wall, look.material));
-    imgs.utility = makeImg('ph-field-img', fieldSrc(look.wall, look.material));
-    imgs.utilityAlt = makeImg('ph-field-img', fieldSrc(look.wall, look.material));
+    var panelSrc = WP + look.wall + '-panel.jpg';
+    var imgs = { photo: makeImg('photo', WP + look.wall + '.jpg'), bg: makeImg('sheet-bg', panelSrc) }, keys, left, allOk = true;
+    if (S.c.layout !== 'cards') {
+      imgs.mat = makeImg('mat-img', panelSrc);
+      imgs.field = makeImg('ph-field-img', panelSrc);
+      imgs.fieldAlt = makeImg('ph-field-img', panelSrc);
+      imgs.utility = makeImg('ph-field-img', panelSrc);
+      imgs.utilityAlt = makeImg('ph-field-img', panelSrc);
+    }
     keys = Object.keys(imgs); left = keys.length;
     keys.forEach(function (k) { whenReady(imgs[k], function (ok) {
       allOk = allOk && ok;
@@ -2522,7 +2589,37 @@
     if (code === 9) { ev.preventDefault(); return; }
     if (!k || ev.metaKey || ev.ctrlKey || ev.altKey) return;
     ev.preventDefault();
-    if (ambientActive && (k === 'left' || k === 'right')) {
+    if (k === 'red') {
+      if (ev.repeat) return;
+      if (oledBlack) { touchActivity(); return; }
+      playUiSound('back');
+      enterOledSleep();
+      return;
+    }
+    if (k === 'green') {
+      if (ev.repeat) return;
+      lastActivity = Date.now();
+      nightOverride = !isNightDim();
+      playUiSound('select');
+      render();
+      showSnazzyToast(nightOverride ? 'Night dim on' : 'Night dim off');
+      return;
+    }
+    if (k === 'yellow') {
+      if (ev.repeat) return;
+      if (ambientActive || oledBlack) { touchActivity(); playUiSound('back'); }
+      else { playUiSound('move'); enterAmbient(); }
+      return;
+    }
+    if (k === 'blue') {
+      if (ev.repeat) return;
+      lastActivity = Date.now();
+      if (oledBlack) { touchActivity(); return; }
+      playUiSound('move');
+      nextAerialVideo();
+      return;
+    }
+    if (ambientActive && !oledBlack && (k === 'left' || k === 'right')) {
       lastActivity = Date.now();
       playUiSound('move');
       if (k === 'right') nextAerialVideo();

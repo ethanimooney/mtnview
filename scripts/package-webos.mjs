@@ -25,7 +25,8 @@ fs.mkdirSync(controlRoot, { recursive: true });
 
 function isRuntimeSource(rel) {
   if (rel === 'config.xml' || rel === 'grid.css' || rel === 'optics.js' || rel === '.DS_Store' || rel.endsWith('/.DS_Store')) return false;
-  if (rel.startsWith('assets/grid/') || rel.startsWith('assets/vendor/') || rel.startsWith('assets/aerials/')) return false;
+  if (rel.startsWith('assets/grid/') || rel.startsWith('assets/vendor/') || rel.startsWith('assets/aerials/') || rel.startsWith('assets/materials/') || rel.startsWith('assets/fonts/')) return false;
+  if (rel === 'assets/typefaces.css' || rel === 'assets/private-fonts.css') return false;
   if (/^assets\/wallpapers\/[^/]+-glass-\d+\.png$/.test(rel)) return false;
   return true;
 }
@@ -47,11 +48,9 @@ function copyTree(srcDir, relBase = '') {
 }
 
 copyTree(appDir);
-const privCss = '/* Local font overlay. Proprietary binaries are not part of app/. */\n';
-const fontCat = 'window.CleanFramePrivateFontIDs = ["geist", "newsreader"];\n';
-fs.writeFileSync(path.join(appTarget, 'assets/private-fonts.css'), privCss);
+const fontCat = 'window.CleanFramePrivateFontIDs = [];\n';
 fs.writeFileSync(path.join(appTarget, 'assets/font-catalog.js'), fontCat);
-installedBytes += Buffer.byteLength(privCss) + Buffer.byteLength(fontCat);
+installedBytes += Buffer.byteLength(fontCat);
 
 const controlText = [
   `Package: ${appId}`,
