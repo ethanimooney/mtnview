@@ -1,0 +1,421 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>mtnview — A minimalist, ad-free home launcher for LG webOS</title>
+  <meta name="description" content="Replace LG webOS's cluttered Home with live HDMI input cards, full-length mountain Aerials, and OLED burn-in protection. Free &amp; open source.">
+  <meta property="og:title" content="mtnview — Minimalist LG webOS TV Launcher">
+  <meta property="og:description" content="A quiet, ad-free home screen for LG webOS TVs with live HDMI cards, mountain Aerials, and OLED protection.">
+  <meta property="og:type" content="website">
+  <meta property="og:image" content="assets/screenshot-home.png">
+  <meta name="theme-color" content="#080b0e">
+  <link rel="icon" type="image/png" href="assets/favicon.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- Top Navigation -->
+  <header class="nav">
+    <div class="nav-inner">
+      <a class="brand" href="#top" aria-label="mtnview home">
+        <img src="assets/icon.png" alt="" class="brand-icon" width="28" height="28">
+        <span class="brand-name">mtnview</span>
+        <span class="brand-ver">v1.1.0</span>
+      </a>
+      <nav class="nav-links" aria-label="Primary">
+        <a href="#demo">Demo</a>
+        <a href="#features">Features</a>
+        <a href="#screenshots">Screenshots</a>
+        <a href="#install">Install</a>
+        <a href="#remote">Remote</a>
+      </nav>
+      <div class="nav-cta">
+        <a class="btn btn-ghost" href="https://github.com/ethanimooney/mtnview" target="_blank" rel="noopener">GitHub</a>
+        <a class="btn btn-primary" href="https://github.com/ethanimooney/mtnview/releases/latest" target="_blank" rel="noopener">Download .ipk</a>
+      </div>
+    </div>
+  </header>
+
+  <main id="top">
+    <!-- Hero Section -->
+    <section class="hero">
+      <div class="container hero-header">
+        <div class="eyebrow">
+          <span class="eyebrow-dot"></span>
+          Built for LG webOS OLED TVs · Open Source (MIT)
+        </div>
+        <h1>A quiet, ad-free home screen for LG webOS.</h1>
+        <p class="hero-sub">
+          Replace LG’s cluttered Home with live HDMI input cards, full-length mountain Aerials, and OLED panel protection. Lightweight (~109&nbsp;KB), fast, and works rooted or non-rooted.
+        </p>
+        <div class="hero-actions">
+          <a class="btn btn-primary btn-lg" href="https://github.com/ethanimooney/mtnview/releases/latest" target="_blank" rel="noopener">
+            <svg viewBox="0 0 24 24" class="btn-ico" aria-hidden="true"><path d="M12 3v12m0 0-4.5-4.5M12 15l4.5-4.5M4 19h16"/></svg>
+            Download Latest .ipk
+          </a>
+          <a class="btn btn-secondary btn-lg" href="#install">
+            Setup Guide
+          </a>
+          <a class="btn btn-ghost btn-lg" href="https://github.com/ethanimooney/mtnview" target="_blank" rel="noopener">
+            View Source
+          </a>
+        </div>
+      </div>
+
+      <!-- Interactive TV Simulator -->
+      <div class="container tv-wrap" id="demo">
+        <div class="tv-glow" aria-hidden="true"></div>
+        <div class="tv-bezel">
+          <div class="tv-screen" id="tvScreen" tabindex="0" aria-label="Interactive mtnview TV preview. Use arrow keys or click cards to navigate.">
+            <!-- Backdrops -->
+            <div class="tv-backdrop">
+              <img class="tv-aerial is-active" id="aerialImg0" src="assets/aerial-yosemite.jpg" alt="Yosemite Valley mountain aerial">
+              <img class="tv-aerial" id="aerialImg1" src="assets/aerial-highlands.jpg" alt="Scottish Highlands mountain aerial">
+              <div class="tv-vignette"></div>
+              <div class="tv-night-veil"></div>
+            </div>
+
+            <!-- Top Bar -->
+            <button type="button" class="tv-pill tv-settings-pill" id="tvSettingsBtn" aria-label="Open Settings">
+              <svg class="tv-ico" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="m9 3-.6 2.4-2 1.2L4 6l-2 3.5L3.8 11v2L2 14.5 4 18l2.4-.6 2 1.2L9 21h6l.6-2.4 2-1.2 2.4.6 2-3.5-1.8-1.5v-2L22 9.5 20 6l-2.4.6-2-1.2L15 3Z"/>
+                <circle cx="12" cy="12" r="3.2"/>
+              </svg>
+              <span>Settings</span>
+            </button>
+
+            <div class="tv-pill tv-clock-pill" id="tvClockPill">
+              <span class="tv-weather">
+                <svg class="tv-ico" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M17.5 19H9a5 5 0 1 1 1.4-9.8A6 6 0 0 1 21 12.5a4.5 4.5 0 0 1-3.5 6.5Z"/>
+                </svg>
+                <span>58°</span>
+              </span>
+              <span class="tv-time" id="tvTime">8:14</span>
+              <span class="tv-ampm" id="tvAmPm">PM</span>
+            </div>
+
+            <!-- Main Home Stage -->
+            <div class="tv-stage-body" id="tvStageBody">
+              <div class="tv-hero">
+                <div class="tv-hero-title" id="tvHeroTitle">Apple TV</div>
+                <div class="tv-prompt" id="tvPrompt">
+                  <span>Press</span>
+                  <span class="tv-ok-badge">OK</span>
+                  <span id="tvPromptVerb">to watch</span>
+                  <span class="tv-prompt-sep">·</span>
+                  <span id="tvPromptMeta">HDMI 1</span>
+                  <span class="tv-power-tag" id="tvPowerTag">· Active</span>
+                </div>
+              </div>
+
+              <div class="tv-card-row" id="tvCardRow" role="listbox" aria-label="TV Inputs"></div>
+            </div>
+
+            <!-- Switching State -->
+            <div class="tv-switching" id="tvSwitching" hidden>
+              <div class="tv-sw-icon" id="tvSwIcon"></div>
+              <div class="tv-sw-sub">Switching input<span class="tv-spinner"><i></i><i></i><i></i><i></i></span></div>
+              <div class="tv-sw-title" id="tvSwTitle">Apple TV</div>
+              <button type="button" class="tv-back-hint" id="tvSwBack">
+                <span class="tv-key-pill">Back</span> Return to mtnview
+              </button>
+            </div>
+
+            <!-- Settings Overlay -->
+            <div class="tv-settings-overlay" id="tvSettingsOverlay" hidden>
+              <div class="tv-ov-left">
+                <button type="button" class="tv-ov-back" id="tvOvBack">← Settings</button>
+                <div class="tv-ov-heading">Mountain Aerials</div>
+                <div class="tv-ov-sub">Now playing</div>
+                <div class="tv-ov-list" id="tvAerialList"></div>
+              </div>
+              <div class="tv-ov-right">
+                <div class="tv-mini-preview">
+                  <img id="tvMiniImg" src="assets/aerial-yosemite.jpg" alt="Aerial preview">
+                  <div class="tv-mini-caption" id="tvMiniCaption">Yosemite Valley</div>
+                </div>
+                <div class="tv-ov-toggles">
+                  <button type="button" class="tv-ov-chip" id="tvOvAmbient">Ambient Mode</button>
+                  <button type="button" class="tv-ov-chip" id="tvOvNight">Night Dim</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Ambient Mode Overlay -->
+            <div class="tv-ambient" id="tvAmbient" aria-hidden="true">
+              <div class="tv-amb-time-row">
+                <span class="tv-amb-time" id="tvAmbTime">8:14</span>
+                <span class="tv-amb-ampm" id="tvAmbAmPm">PM</span>
+              </div>
+              <div class="tv-amb-meta">
+                <span id="tvAmbDate">Saturday, Nov 28</span>
+                <span class="tv-amb-sep">·</span>
+                <span>58° Mostly Clear</span>
+              </div>
+            </div>
+
+            <!-- Location Caption -->
+            <div class="tv-loc" id="tvLoc">
+              <div class="tv-loc-title" id="tvLocTitle">Yosemite Valley</div>
+              <div class="tv-loc-sub" id="tvLocSub">California</div>
+            </div>
+
+            <!-- Toast -->
+            <div class="tv-toast" id="tvToast" aria-live="polite"></div>
+
+            <!-- OLED Screen Off -->
+            <div class="tv-oled-black" id="tvOledBlack">
+              <div class="tv-oled-hint">OLED Screen Off · Click anywhere or press any key to wake</div>
+            </div>
+          </div>
+          <div class="tv-chin" aria-hidden="true">
+            <span class="tv-led" id="tvLed"></span>
+          </div>
+        </div>
+
+        <!-- Interactive Remote Controls Bar -->
+        <div class="remote-bar" role="toolbar" aria-label="Simulated Magic Remote controls">
+          <div class="remote-group">
+            <span class="remote-label">Try the launcher</span>
+            <button type="button" class="rem-btn" id="remLeft" title="Previous card (Left Arrow)">←</button>
+            <button type="button" class="rem-btn rem-ok" id="remOk" title="Select card (Enter)">OK</button>
+            <button type="button" class="rem-btn" id="remRight" title="Next card (Right Arrow)">→</button>
+          </div>
+          <div class="remote-divider" aria-hidden="true"></div>
+          <div class="remote-group">
+            <button type="button" class="rem-color" id="remRed" data-color="red">
+              <span class="color-dot dot-red"></span> Screen Off
+            </button>
+            <button type="button" class="rem-color" id="remGreen" data-color="green">
+              <span class="color-dot dot-green"></span> Night Dim
+            </button>
+            <button type="button" class="rem-color" id="remYellow" data-color="yellow">
+              <span class="color-dot dot-yellow"></span> Ambient
+            </button>
+            <button type="button" class="rem-color" id="remBlue" data-color="blue">
+              <span class="color-dot dot-blue"></span> Next Aerial
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="section" id="features">
+      <div class="container">
+        <div class="section-head">
+          <div class="section-kicker">Features</div>
+          <h2>Everything you want on your TV. Nothing you don’t.</h2>
+          <p>Designed around how people actually use an OLED TV with an Apple TV or game consoles — fast input switching, zero ads, and thoughtful panel care.</p>
+        </div>
+
+        <div class="feature-grid">
+          <article class="feature-card">
+            <div class="feature-icon">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="7" width="18" height="10" rx="2"/><path d="M7 12h10"/></svg>
+            </div>
+            <h3>Live Dynamic HDMI Cards</h3>
+            <p>Reads plugged-in inputs, CEC device names, and live power state directly from webOS. Automatically hides eARC soundbars/AVRs and matches icons for Apple TV, PS5, Switch, Xbox, and PC/Mac.</p>
+          </article>
+
+          <article class="feature-card">
+            <div class="feature-icon">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 18 6-10 4.5 7 3-4.5L21 18Z"/></svg>
+            </div>
+            <h3>Full-Length Mountain Aerials</h3>
+            <p>6 uncut (4–7 min) Yosemite &amp; Scottish Highlands Aerials stored persistently on the TV with seamless dual-<code>&lt;video&gt;</code> crossfades, single hardware decoder, and subtle location captions.</p>
+          </article>
+
+          <article class="feature-card">
+            <div class="feature-icon">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+            </div>
+            <h3>OLED Ambient &amp; Protection</h3>
+            <p>Enters Ambient Mode after 2.5 min idle with a drifting Inter clock, date, and weather overlay. Automatically powers off the OLED panel after 30 or 60 min and dims from 9&nbsp;PM–6&nbsp;AM.</p>
+          </article>
+
+          <article class="feature-card">
+            <div class="feature-icon">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7Z"/></svg>
+            </div>
+            <h3>Zero-Flash Native Home</h3>
+            <p>On rooted TVs with Home Chooser, pressing Home launches mtnview natively with zero LG Home flash. Optional daemons add auto-return when consoles power off and <code>/etc/hosts</code> ad-blocking.</p>
+          </article>
+
+          <article class="feature-card">
+            <div class="feature-icon">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 0 9 9"/><path d="M12 3v9l6-3"/></svg>
+            </div>
+            <h3>Global-Ready &amp; Magic Remote</h3>
+            <p>Auto-detects 12h/24h clock and °F/°C weather from your locale, supports Magic Remote pointer hover focus, and tucks installed webOS apps cleanly under Settings → LG TV.</p>
+          </article>
+
+          <article class="feature-card">
+            <div class="feature-icon">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7 9 18l-5-5"/></svg>
+            </div>
+            <h3>Tiny Footprint, Any webOS TV</h3>
+            <p>Pure ES5 JavaScript and lean GPU-friendly CSS (~109&nbsp;KB <code>.ipk</code>). Installs in seconds on non-rooted TVs via webOS Dev Manager, or unlocks full daemons on rooted TVs via Homebrew Channel.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- Real TV Screenshots -->
+    <section class="section section-alt" id="screenshots">
+      <div class="container">
+        <div class="section-head">
+          <div class="section-kicker">On-TV Captures</div>
+          <h2>Captured straight from an LG OLED C6.</h2>
+          <p>Tested on LG OLED C6 (webOS 11.2.0 / Rockhopper) with crisp 1080p scaling, frosted glass cards, and hardware-decoded mountain Aerials.</p>
+        </div>
+
+        <div class="shots-grid">
+          <figure class="shot-card">
+            <img src="assets/screenshot-home.png" alt="mtnview Home screen running on LG webOS with Yosemite Valley aerial" loading="lazy">
+            <figcaption>
+              <strong>Home Screen</strong>
+              <span>Live HDMI cards over Yosemite Valley Aerial with clock &amp; weather pill</span>
+            </figcaption>
+          </figure>
+          <figure class="shot-card">
+            <img src="assets/screenshot-settings.png" alt="mtnview Mountain Aerials settings screen with live miniature preview" loading="lazy">
+            <figcaption>
+              <strong>Mountain Aerials Picker</strong>
+              <span>Live scaled miniature preview of your Home screen while choosing Aerials</span>
+            </figcaption>
+          </figure>
+        </div>
+      </div>
+    </section>
+
+    <!-- Install Section -->
+    <section class="section" id="install">
+      <div class="container">
+        <div class="section-head">
+          <div class="section-kicker">Installation</div>
+          <h2>Up and running in two minutes.</h2>
+          <p>Start with the pre-built <code>.ipk</code> on any LG webOS TV, or run the full rooted setup for persistent Aerials, zero-flash Home, and ad-blocking.</p>
+        </div>
+
+        <div class="install-tabs" role="tablist" aria-label="Installation method">
+          <button type="button" class="tab-btn is-active" role="tab" aria-selected="true" data-tab="quick">Quick Install (Any TV)</button>
+          <button type="button" class="tab-btn" role="tab" aria-selected="false" data-tab="rooted">Full Rooted Setup (Aerials + Daemons)</button>
+        </div>
+
+        <div class="install-panel is-active" id="panel-quick" role="tabpanel">
+          <div class="steps-grid">
+            <div class="step-card">
+              <div class="step-num">01</div>
+              <h3>Download the <code>.ipk</code></h3>
+              <p>Grab <code>com.mtnview.launcher_1.1.0_all.ipk</code> (~109&nbsp;KB) from the latest GitHub Release.</p>
+              <a class="step-link" href="https://github.com/ethanimooney/mtnview/releases/latest" target="_blank" rel="noopener">Open Latest Release →</a>
+            </div>
+            <div class="step-card">
+              <div class="step-num">02</div>
+              <h3>Install to your LG TV</h3>
+              <p>Sideload it with <strong>webOS Dev Manager</strong> (no root required) or install directly through <strong>Homebrew Channel</strong>.</p>
+              <a class="step-link" href="https://github.com/webosbrew/dev-manager-desktop" target="_blank" rel="noopener">Get webOS Dev Manager →</a>
+            </div>
+            <div class="step-card">
+              <div class="step-num">03</div>
+              <h3>Launch &amp; enjoy</h3>
+              <p>Open <strong>mtnview</strong> from your TV’s app bar. Your plugged-in HDMI devices appear automatically.</p>
+              <a class="step-link" href="https://github.com/ethanimooney/mtnview#installation" target="_blank" rel="noopener">Read full README →</a>
+            </div>
+          </div>
+        </div>
+
+        <div class="install-panel" id="panel-rooted" role="tabpanel" hidden>
+          <div class="code-box">
+            <div class="code-head">
+              <span>Requires a rooted LG webOS TV with Homebrew Channel, Home Chooser, SSH &amp; Node.js 20+</span>
+              <button type="button" class="copy-btn" id="copyCodeBtn">Copy commands</button>
+            </div>
+            <pre><code id="rootedSnippet"># 1. Clone and set your TV's local IP
+git clone https://github.com/ethanimooney/mtnview.git
+cd mtnview
+mkdir -p .local
+printf "LG_TV_IP=192.168.1.XX\nNODE_BIN=$(which node)\n" &gt; .local/tv.env
+
+# 2. Fetch &amp; convert the 6 Yosemite &amp; Scottish Highlands Aerials locally
+./scripts/download-aerials.sh
+
+# 3. Build &amp; install mtnview (~109 KB), sync Aerials, and install TV daemons
+./scripts/deploy-lg.sh
+./scripts/sync-aerials-lg.sh
+./scripts/restore-tv.sh</code></pre>
+          </div>
+          <p class="install-note">Then open <strong>Home Chooser</strong> on your TV and select <strong>mtnview</strong> — pressing the Home button now opens mtnview natively with zero LG Home flash.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Magic Remote Shortcuts -->
+    <section class="section section-alt" id="remote">
+      <div class="container">
+        <div class="section-head">
+          <div class="section-kicker">Magic Remote</div>
+          <h2>Turn branded remote buttons into useful shortcuts.</h2>
+          <p>The optional rooted daemon auto-discovers your HDMI ports and remaps unused streaming buttons globally — plus quick color keys inside mtnview.</p>
+        </div>
+
+        <div class="shortcuts-grid">
+          <div class="shortcut-col">
+            <h3 class="shortcut-col-title">Global (Rooted Daemon)</h3>
+            <ul class="shortcut-list">
+              <li><span class="key-tag">Home</span><span>Opens mtnview natively via Home Chooser</span></li>
+              <li><span class="key-tag">Netflix</span><span>Switches to Apple TV (auto-resolved HDMI)</span></li>
+              <li><span class="key-tag">Prime Video</span><span>Switches to PlayStation (auto-resolved HDMI)</span></li>
+              <li><span class="key-tag">Disney+</span><span>Switches to Nintendo Switch (auto-resolved HDMI)</span></li>
+              <li><span class="key-tag">LG Channels</span><span>Turns OLED screen off (keeps eARC audio on)</span></li>
+            </ul>
+          </div>
+          <div class="shortcut-col">
+            <h3 class="shortcut-col-title">Inside mtnview (Any TV)</h3>
+            <ul class="shortcut-list">
+              <li><span class="key-tag key-red">Red</span><span>Turns OLED screen off</span></li>
+              <li><span class="key-tag key-green">Green</span><span>Toggles Night Dim</span></li>
+              <li><span class="key-tag key-yellow">Yellow</span><span>Toggles Ambient Mode</span></li>
+              <li><span class="key-tag key-blue">Blue</span><span>Skips to next mountain Aerial</span></li>
+              <li><span class="key-tag">Down</span><span>Enters Ambient Mode (Left/Right skips Aerials)</span></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Bottom CTA -->
+    <section class="section cta-section">
+      <div class="container cta-box">
+        <img src="assets/icon.png" alt="mtnview icon" width="64" height="64" class="cta-icon">
+        <h2>Give your LG OLED the home screen it deserves.</h2>
+        <p>Free, open source, and MIT licensed. Built for people who just want to pick an input and watch.</p>
+        <div class="hero-actions">
+          <a class="btn btn-primary btn-lg" href="https://github.com/ethanimooney/mtnview/releases/latest" target="_blank" rel="noopener">Download v1.1.0 (.ipk)</a>
+          <a class="btn btn-secondary btn-lg" href="https://github.com/ethanimooney/mtnview" target="_blank" rel="noopener">Star on GitHub</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="container footer-inner">
+      <div class="footer-left">
+        <img src="assets/icon.png" alt="" width="20" height="20" class="brand-icon">
+        <span><strong>mtnview</strong> · Originally forked from <a href="https://github.com/nthnclrk/CleanFrame" target="_blank" rel="noopener">CleanFrame</a></span>
+      </div>
+      <div class="footer-links">
+        <a href="https://github.com/ethanimooney/mtnview" target="_blank" rel="noopener">GitHub</a>
+        <a href="https://github.com/ethanimooney/mtnview/releases" target="_blank" rel="noopener">Releases</a>
+        <a href="https://github.com/ethanimooney/mtnview/issues" target="_blank" rel="noopener">Issues</a>
+        <a href="https://github.com/ethanimooney/mtnview/blob/main/LICENSE" target="_blank" rel="noopener">MIT License</a>
+      </div>
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
