@@ -1,0 +1,10 @@
+#!/bin/sh
+# Optional webOS init.d tweak: hides the persistent floating mute indicator
+# and the on-screen volume/mute overlay (useful when an AVR/soundbar shows volume).
+# Not installed automatically by scripts/restore-tv.sh.
+#
+# To install on a rooted LG TV:
+#   scp tv-backup/optional/20-hide-volume-osd root@<TV_IP>:/var/lib/webosbrew/init.d/
+#   ssh root@<TV_IP> 'chmod +x /var/lib/webosbrew/init.d/20-hide-volume-osd && /var/lib/webosbrew/init.d/20-hide-volume-osd'
+
+luna-send -n 1 luna://com.webos.service.config/setConfigs '{"configs":{"com.webos.surfacemanager.disableMuteAnimation":true,"com.webos.surfacemanager.volumeOSD":false}}' >/dev/null 2>&1 &
