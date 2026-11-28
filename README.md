@@ -6,6 +6,7 @@
 
 <p align="center">
   A minimalist, ad-free home launcher (<code>com.mtnview.launcher</code>) for <strong>LG webOS</strong> TVs.<br/>
+  <strong><a href="https://mtnview.tv">Interactive Demo &amp; Website → mtnview.tv</a></strong><br/>
   <em>Originally forked from <a href="https://github.com/nthnclrk/CleanFrame">CleanFrame</a> and rebuilt for LG webOS OLED TVs.</em>
 </p>
 
